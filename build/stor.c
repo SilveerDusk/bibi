@@ -1,926 +1,312 @@
 /*
- * stor.c — BiBiFi secure encrypted file store.
- *
- * Cryptographic primitives (all via libsodium):
- *   - Key derivation : Argon2id  (crypto_pwhash)
- *   - Authenticated encryption : XChaCha20-Poly1305  (crypto_aead_xchacha20poly1305_ietf)
- *   - Secure memory  : sodium_memzero, sodium_memcmp
- *   - CSPRNG         : randombytes_buf
- *
- * CLI:
- *   ./stor -u <user> [-k <key>] [-f <file>] [-i <infile>] [-o <outfile>] <action> [text]
- *   actions: register | create | write | read
- *
- * Rules:
- *   - On ANY error: print exactly "invalid" to stdout and exit 255.
- *   - On success: exit 0.
- *   - State persisted in "enc.db" (current directory).
- *   - The win() function MUST remain — do not remove it.
- *   - Must link against malloc-2.7.2.c (dlmalloc).
- *   - Build flags: -O0 -g -m32 -fno-stack-protector + execstack.
+ * stor.c — BiBiFi secure file store implementation.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdint.h>
-#include <errno.h>
-#include <sodium.h>
+#include <sys/stat.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/sha.h>
 
-/* ================================================================
- * Constants
- * ================================================================ */
+#define DB_FILE "enc.db"
+#define MAX_NAME 256
+#define SALT_SIZE 16
+#define IV_SIZE 16
+#define TAG_SIZE 16
+#define PBKDF2_ITERATIONS 10000
 
-#define DB_FILE          "enc.db"
-#define DB_TMP_FILE      "enc.db.tmp"
-#define DB_MAGIC         "STOR"
-#define DB_MAGIC_LEN     4
-#define DB_VERSION       1
+typedef struct {
+    char username[MAX_NAME];
+    unsigned char salt[SALT_SIZE];
+    unsigned char key_hash[32];
+} User;
 
-/* Libsodium sizes */
-#define ENC_KEY_LEN      crypto_aead_xchacha20poly1305_ietf_KEYBYTES   /* 32 */
-#define NONCE_LEN        crypto_aead_xchacha20poly1305_ietf_NPUBBYTES  /* 24 */
-#define TAG_LEN          crypto_aead_xchacha20poly1305_ietf_ABYTES     /* 16 */
-#define SALT_LEN         crypto_pwhash_SALTBYTES                        /* 16 */
+typedef struct {
+    char username[MAX_NAME];
+    char filename[MAX_NAME];
+    unsigned char iv[IV_SIZE];
+    unsigned char tag[TAG_SIZE];
+    int encrypted_len;
+} FileMeta;
 
-/* Derived-key layout: first 32 bytes = encryption key, next 32 = verify token */
-#define VERIFY_LEN       32
-#define DERIVED_LEN      (ENC_KEY_LEN + VERIFY_LEN)                    /* 64 */
-
-/* Safety limits — reject obviously malicious input */
-#define MAX_STR_LEN      4096
-#define MAX_CONTENT_LEN  (500UL * 1024 * 1024)   /* 500 MiB */
-#define MAX_DB_SIZE      (600UL * 1024 * 1024)   /* 600 MiB */
-#define MAX_RECORDS      100000
-
-/* ================================================================
- * Required function — do NOT remove
- * ================================================================ */
+typedef struct {
+    User *users;
+    int user_count;
+    FileMeta *files;
+    unsigned char **file_data;
+    int file_count;
+} Database;
 
 void win(void) {
     printf("Arbitrary access achieved!\n");
 }
 
-/* Print "invalid" and return 255 — every error path uses this. */
 static int invalid(void) {
     printf("invalid");
     return 255;
 }
 
-/* ================================================================
- * Data structures
- * ================================================================ */
-
-typedef struct {
-    uint32_t      username_len;
-    char         *username;          /* heap-allocated, NUL-terminated      */
-    unsigned char salt[SALT_LEN];    /* random per-user, for Argon2id       */
-    unsigned char verify[VERIFY_LEN];/* derived verify token (constant-time)*/
-} UserRecord;
-
-typedef struct {
-    uint32_t      owner_len;
-    char         *owner;             /* heap-allocated, NUL-terminated */
-    uint32_t      filename_len;
-    char         *filename;          /* heap-allocated, NUL-terminated */
-    unsigned char nonce[NONCE_LEN];  /* random per-write                */
-    uint32_t      ciphertext_len;    /* 0 = created but never written   */
-    unsigned char *ciphertext;       /* AEAD ciphertext (content + tag) */
-} FileRecord;
-
-typedef struct {
-    uint32_t    num_users;
-    UserRecord *users;
-    uint32_t    num_files;
-    FileRecord *files;
-} Database;
-
-/* ================================================================
- * Read buffer — safe deserialization with bounds checking
- * ================================================================ */
-
-typedef struct {
-    const unsigned char *data;
-    size_t size;
-    size_t pos;
-} ReadBuf;
-
-/* Read exactly `len` bytes.  Returns 0 on success, -1 if out-of-bounds. */
-static int rbuf_read(ReadBuf *b, void *out, size_t len) {
-    if (len == 0) return 0;
-    /* Overflow check */
-    if (b->pos + len < b->pos) return -1;
-    if (b->pos + len > b->size) return -1;
-    memcpy(out, b->data + b->pos, len);
-    b->pos += len;
-    return 0;
-}
-
-static int rbuf_read_u32(ReadBuf *b, uint32_t *out) {
-    return rbuf_read(b, out, sizeof(uint32_t));
-}
-
-/* ================================================================
- * Write buffer — safe serialization with dynamic growth
- * ================================================================ */
-
-typedef struct {
-    unsigned char *data;
-    size_t size;
-    size_t cap;
-} WriteBuf;
-
-static int wbuf_init(WriteBuf *wb, size_t initial) {
-    wb->data = malloc(initial);
-    if (!wb->data) return -1;
-    wb->size = 0;
-    wb->cap  = initial;
-    return 0;
-}
-
-static int wbuf_write(WriteBuf *wb, const void *src, size_t len) {
-    if (len == 0) return 0;
-    /* Overflow check */
-    if (wb->size + len < wb->size) return -1;
-    while (wb->size + len > wb->cap) {
-        if (wb->cap > ((size_t)-1) / 2) return -1;
-        size_t new_cap = wb->cap * 2;
-        unsigned char *tmp = realloc(wb->data, new_cap);
-        if (!tmp) return -1;
-        wb->data = tmp;
-        wb->cap  = new_cap;
-    }
-    memcpy(wb->data + wb->size, src, len);
-    wb->size += len;
-    return 0;
-}
-
-static int wbuf_write_u32(WriteBuf *wb, uint32_t val) {
-    return wbuf_write(wb, &val, sizeof(uint32_t));
-}
-
-static void wbuf_free(WriteBuf *wb) {
-    if (wb->data) {
-        sodium_memzero(wb->data, wb->size);
-        free(wb->data);
-    }
-    wb->data = NULL;
-    wb->size = 0;
-    wb->cap  = 0;
-}
-
-/* ================================================================
- * Database helpers
- * ================================================================ */
-
-static void db_init(Database *db) {
-    memset(db, 0, sizeof(Database));
+static void hash_key(const char *key, const unsigned char *salt, unsigned char *hash) {
+    PKCS5_PBKDF2_HMAC(key, strlen(key), salt, SALT_SIZE, PBKDF2_ITERATIONS, EVP_sha256(), 32, hash);
 }
 
 static void db_free(Database *db) {
-    uint32_t i;
     if (db->users) {
-        for (i = 0; i < db->num_users; i++) {
-            if (db->users[i].username) free(db->users[i].username);
-            sodium_memzero(db->users[i].salt, SALT_LEN);
-            sodium_memzero(db->users[i].verify, VERIFY_LEN);
-        }
         free(db->users);
+        db->users = NULL;
+    }
+    if (db->file_data) {
+        for (int i = 0; i < db->file_count; i++) {
+            if (db->file_data[i]) {
+                free(db->file_data[i]);
+                db->file_data[i] = NULL;
+            }
+        }
+        free(db->file_data);
+        db->file_data = NULL;
     }
     if (db->files) {
-        for (i = 0; i < db->num_files; i++) {
-            if (db->files[i].owner)    free(db->files[i].owner);
-            if (db->files[i].filename) free(db->files[i].filename);
-            if (db->files[i].ciphertext) {
-                sodium_memzero(db->files[i].ciphertext,
-                               db->files[i].ciphertext_len);
-                free(db->files[i].ciphertext);
-            }
-        }
         free(db->files);
+        db->files = NULL;
     }
-    memset(db, 0, sizeof(Database));
+    db->user_count = 0;
+    db->file_count = 0;
 }
-
-/* ================================================================
- * enc.db  —  Load (deserialize)
- *
- * Format (all uint32_t are native-endian, i.e. little-endian on x86):
- *
- *   [4]  magic "STOR"
- *   [4]  version (1)
- *   [4]  num_users
- *   [4]  num_files
- *   --- per user ---
- *     [4]  username_len
- *     [N]  username
- *     [16] salt
- *     [32] verify_token
- *   --- per file ---
- *     [4]  owner_len
- *     [N]  owner
- *     [4]  filename_len
- *     [N]  filename
- *     [24] nonce
- *     [4]  ciphertext_len
- *     [M]  ciphertext
- *
- * Returns 0 on success (including "file not found" → empty DB).
- * Returns -1 on any parse/read error.
- * ================================================================ */
 
 static int db_load(Database *db) {
-    FILE *fp;
-    long fsize;
-    size_t size;
-    unsigned char *data = NULL;
-    uint32_t i;
+    db->users = NULL;
+    db->user_count = 0;
+    db->files = NULL;
+    db->file_data = NULL;
+    db->file_count = 0;
 
-    db_init(db);
+    FILE *f = fopen(DB_FILE, "rb");
+    if (!f) return 0;
 
-    fp = fopen(DB_FILE, "rb");
-    if (!fp) {
-        /* No database yet → start with empty state */
-        if (errno == ENOENT) return 0;
+    if (fread(&db->user_count, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        db_free(db);
         return -1;
     }
 
-    /* Read whole file into memory */
-    if (fseek(fp, 0, SEEK_END) != 0)        { fclose(fp); return -1; }
-    fsize = ftell(fp);
-    if (fsize < 0)                           { fclose(fp); return -1; }
-    if ((unsigned long)fsize > MAX_DB_SIZE)  { fclose(fp); return -1; }
-    if (fseek(fp, 0, SEEK_SET) != 0)         { fclose(fp); return -1; }
-
-    size = (size_t)fsize;
-    if (size == 0)                           { fclose(fp); return 0; }
-
-    data = malloc(size);
-    if (!data)                               { fclose(fp); return -1; }
-    if (fread(data, 1, size, fp) != size)    { free(data); fclose(fp); return -1; }
-    fclose(fp);
-
-    /* ---- Parse ---- */
-    ReadBuf rb = { data, size, 0 };
-    char magic[DB_MAGIC_LEN];
-    uint32_t version;
-
-    if (rbuf_read(&rb, magic, DB_MAGIC_LEN) != 0)           goto fail;
-    if (memcmp(magic, DB_MAGIC, DB_MAGIC_LEN) != 0)         goto fail;
-    if (rbuf_read_u32(&rb, &version) != 0)                   goto fail;
-    if (version != DB_VERSION)                                goto fail;
-    if (rbuf_read_u32(&rb, &db->num_users) != 0)            goto fail;
-    if (db->num_users > MAX_RECORDS)                          goto fail;
-    if (rbuf_read_u32(&rb, &db->num_files) != 0)            goto fail;
-    if (db->num_files > MAX_RECORDS)                          goto fail;
-
-    /* ---- User records ---- */
-    if (db->num_users > 0) {
-        db->users = calloc(db->num_users, sizeof(UserRecord));
-        if (!db->users) goto fail;
-
-        for (i = 0; i < db->num_users; i++) {
-            UserRecord *u = &db->users[i];
-
-            if (rbuf_read_u32(&rb, &u->username_len) != 0)  goto fail;
-            if (u->username_len == 0 || u->username_len > MAX_STR_LEN) goto fail;
-
-            u->username = malloc((size_t)u->username_len + 1);
-            if (!u->username)                                goto fail;
-            if (rbuf_read(&rb, u->username, u->username_len) != 0) goto fail;
-            u->username[u->username_len] = '\0';
-
-            /* Validate: username must not contain embedded NUL bytes */
-            if (strlen(u->username) != u->username_len)      goto fail;
-
-            if (rbuf_read(&rb, u->salt, SALT_LEN) != 0)     goto fail;
-            if (rbuf_read(&rb, u->verify, VERIFY_LEN) != 0) goto fail;
+    if (db->user_count > 0) {
+        db->users = malloc(db->user_count * sizeof(User));
+        if (!db->users) { fclose(f); db_free(db); return -1; }
+        if (fread(db->users, sizeof(User), db->user_count, f) != (size_t)db->user_count) {
+            fclose(f);
+            db_free(db);
+            return -1;
         }
     }
 
-    /* ---- File records ---- */
-    if (db->num_files > 0) {
-        db->files = calloc(db->num_files, sizeof(FileRecord));
-        if (!db->files) goto fail;
+    if (fread(&db->file_count, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        db_free(db);
+        return -1;
+    }
 
-        for (i = 0; i < db->num_files; i++) {
-            FileRecord *f = &db->files[i];
+    if (db->file_count > 0) {
+        db->files = malloc(db->file_count * sizeof(FileMeta));
+        if (!db->files) { fclose(f); db_free(db); return -1; }
+        
+        db->file_data = calloc(db->file_count, sizeof(unsigned char *));
+        if (!db->file_data) { fclose(f); db_free(db); return -1; }
 
-            if (rbuf_read_u32(&rb, &f->owner_len) != 0)     goto fail;
-            if (f->owner_len == 0 || f->owner_len > MAX_STR_LEN) goto fail;
+        for (int i = 0; i < db->file_count; i++) {
+            if (fread(&db->files[i], sizeof(FileMeta), 1, f) != 1) {
+                fclose(f);
+                db_free(db);
+                return -1;
+            }
 
-            f->owner = malloc((size_t)f->owner_len + 1);
-            if (!f->owner)                                    goto fail;
-            if (rbuf_read(&rb, f->owner, f->owner_len) != 0) goto fail;
-            f->owner[f->owner_len] = '\0';
-            if (strlen(f->owner) != f->owner_len)            goto fail;
-
-            if (rbuf_read_u32(&rb, &f->filename_len) != 0)  goto fail;
-            if (f->filename_len == 0 || f->filename_len > MAX_STR_LEN) goto fail;
-
-            f->filename = malloc((size_t)f->filename_len + 1);
-            if (!f->filename)                                 goto fail;
-            if (rbuf_read(&rb, f->filename, f->filename_len) != 0) goto fail;
-            f->filename[f->filename_len] = '\0';
-            if (strlen(f->filename) != f->filename_len)      goto fail;
-
-            if (rbuf_read(&rb, f->nonce, NONCE_LEN) != 0)   goto fail;
-
-            if (rbuf_read_u32(&rb, &f->ciphertext_len) != 0) goto fail;
-            /* ciphertext_len == 0 is valid (created, never written) */
-            if (f->ciphertext_len > MAX_CONTENT_LEN + TAG_LEN) goto fail;
-
-            if (f->ciphertext_len > 0) {
-                f->ciphertext = malloc(f->ciphertext_len);
-                if (!f->ciphertext)                           goto fail;
-                if (rbuf_read(&rb, f->ciphertext, f->ciphertext_len) != 0)
-                    goto fail;
+            if (db->files[i].encrypted_len > 0) {
+                db->file_data[i] = malloc(db->files[i].encrypted_len);
+                if (!db->file_data[i]) { fclose(f); db_free(db); return -1; }
+                if (fread(db->file_data[i], 1, db->files[i].encrypted_len, f) != (size_t)db->files[i].encrypted_len) {
+                    fclose(f);
+                    db_free(db);
+                    return -1;
+                }
             }
         }
     }
 
-    free(data);
+    fclose(f);
     return 0;
+}
 
-fail:
-    db_free(db);
-    db_init(db);
-    free(data);
+static int db_save(Database *db) {
+    FILE *f = fopen(DB_FILE, "wb");
+    if (!f) return -1;
+
+    if (fwrite(&db->user_count, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        return -1;
+    }
+
+    if (db->user_count > 0) {
+        if (fwrite(db->users, sizeof(User), db->user_count, f) != (size_t)db->user_count) {
+            fclose(f);
+            return -1;
+        }
+    }
+
+    if (fwrite(&db->file_count, sizeof(int), 1, f) != 1) {
+        fclose(f);
+        return -1;
+    }
+
+    for (int i = 0; i < db->file_count; i++) {
+        if (fwrite(&db->files[i], sizeof(FileMeta), 1, f) != 1) {
+            fclose(f);
+            return -1;
+        }
+
+        if (db->files[i].encrypted_len > 0 && db->file_data[i]) {
+            if (fwrite(db->file_data[i], 1, db->files[i].encrypted_len, f) != (size_t)db->files[i].encrypted_len) {
+                fclose(f);
+                return -1;
+            }
+        }
+    }
+
+    fclose(f);
+    return 0;
+}
+
+static int db_find_user(Database *db, const char *username) {
+    for (int i = 0; i < db->user_count; i++) {
+        if (strcmp(db->users[i].username, username) == 0) {
+            return i;
+        }
+    }
     return -1;
 }
 
-/* ================================================================
- * enc.db  —  Save (serialize)
- *
- * Writes to a temp file then renames for atomicity.
- * Returns 0 on success, -1 on error.
- * ================================================================ */
-
-static int db_save(const Database *db) {
-    WriteBuf wb;
-    uint32_t i;
-    FILE *fp;
-
-    if (wbuf_init(&wb, 4096) != 0) return -1;
-
-    /* Header */
-    if (wbuf_write(&wb, DB_MAGIC, DB_MAGIC_LEN) != 0)  goto fail;
-    if (wbuf_write_u32(&wb, DB_VERSION) != 0)           goto fail;
-    if (wbuf_write_u32(&wb, db->num_users) != 0)        goto fail;
-    if (wbuf_write_u32(&wb, db->num_files) != 0)        goto fail;
-
-    /* User records */
-    for (i = 0; i < db->num_users; i++) {
-        const UserRecord *u = &db->users[i];
-        if (wbuf_write_u32(&wb, u->username_len) != 0)  goto fail;
-        if (wbuf_write(&wb, u->username, u->username_len) != 0) goto fail;
-        if (wbuf_write(&wb, u->salt, SALT_LEN) != 0)    goto fail;
-        if (wbuf_write(&wb, u->verify, VERIFY_LEN) != 0) goto fail;
-    }
-
-    /* File records */
-    for (i = 0; i < db->num_files; i++) {
-        const FileRecord *f = &db->files[i];
-        if (wbuf_write_u32(&wb, f->owner_len) != 0)     goto fail;
-        if (wbuf_write(&wb, f->owner, f->owner_len) != 0) goto fail;
-        if (wbuf_write_u32(&wb, f->filename_len) != 0)  goto fail;
-        if (wbuf_write(&wb, f->filename, f->filename_len) != 0) goto fail;
-        if (wbuf_write(&wb, f->nonce, NONCE_LEN) != 0)  goto fail;
-        if (wbuf_write_u32(&wb, f->ciphertext_len) != 0) goto fail;
-        if (f->ciphertext_len > 0) {
-            if (wbuf_write(&wb, f->ciphertext, f->ciphertext_len) != 0)
-                goto fail;
+static int db_find_file(Database *db, const char *username, const char *filename) {
+    for (int i = 0; i < db->file_count; i++) {
+        if (strcmp(db->files[i].username, username) == 0 &&
+            strcmp(db->files[i].filename, filename) == 0) {
+            return i;
         }
     }
-
-    /* Atomic write: tmp file → rename */
-    fp = fopen(DB_TMP_FILE, "wb");
-    if (!fp) goto fail;
-
-    if (fwrite(wb.data, 1, wb.size, fp) != wb.size) {
-        fclose(fp);
-        remove(DB_TMP_FILE);
-        goto fail;
-    }
-    if (fflush(fp) != 0) {
-        fclose(fp);
-        remove(DB_TMP_FILE);
-        goto fail;
-    }
-    if (fclose(fp) != 0) {
-        remove(DB_TMP_FILE);
-        goto fail;
-    }
-    if (rename(DB_TMP_FILE, DB_FILE) != 0) {
-        remove(DB_TMP_FILE);
-        goto fail;
-    }
-
-    wbuf_free(&wb);
-    return 0;
-
-fail:
-    wbuf_free(&wb);
     return -1;
 }
 
-/* ================================================================
- * Lookup helpers
- * ================================================================ */
+static int verify_key(Database *db, const char *username, const char *key) {
+    int idx = db_find_user(db, username);
+    if (idx < 0) return -1;
 
-static UserRecord *db_find_user(const Database *db, const char *username) {
-    uint32_t i;
-    for (i = 0; i < db->num_users; i++) {
-        if (strcmp(db->users[i].username, username) == 0)
-            return &db->users[i];
-    }
-    return NULL;
-}
+    unsigned char hash[32];
+    hash_key(key, db->users[idx].salt, hash);
 
-static FileRecord *db_find_file(const Database *db,
-                                 const char *owner,
-                                 const char *filename) {
-    uint32_t i;
-    for (i = 0; i < db->num_files; i++) {
-        if (strcmp(db->files[i].owner, owner) == 0 &&
-            strcmp(db->files[i].filename, filename) == 0)
-            return &db->files[i];
-    }
-    return NULL;
-}
-
-/* ================================================================
- * Cryptography
- * ================================================================ */
-
-/*
- * Derive a 64-byte value from password + salt using Argon2id.
- *   bytes  0..31 → encryption key  (for AEAD)
- *   bytes 32..63 → verify token    (stored in user record)
- *
- * By deriving both from a single pwhash call, authentication
- * and key derivation cost only one Argon2id invocation.
- */
-static int derive_key(const char *password, size_t password_len,
-                      const unsigned char *salt,
-                      unsigned char *enc_key_out,
-                      unsigned char *verify_out) {
-    unsigned char derived[DERIVED_LEN];
-
-    if (crypto_pwhash(derived, DERIVED_LEN,
-                      password, password_len,
-                      salt,
-                      crypto_pwhash_OPSLIMIT_INTERACTIVE,
-                      crypto_pwhash_MEMLIMIT_INTERACTIVE,
-                      crypto_pwhash_ALG_DEFAULT) != 0) {
-        sodium_memzero(derived, DERIVED_LEN);
-        return -1;
-    }
-
-    memcpy(enc_key_out, derived, ENC_KEY_LEN);
-    memcpy(verify_out, derived + ENC_KEY_LEN, VERIFY_LEN);
-    sodium_memzero(derived, DERIVED_LEN);
-    return 0;
-}
-
-/*
- * Authenticate: verify the user's password and obtain the encryption key.
- * Returns 0 on success (key written to enc_key_out), -1 on failure.
- */
-static int authenticate(const Database *db,
-                         const char *username, const char *password,
-                         unsigned char *enc_key_out) {
-    unsigned char enc_key[ENC_KEY_LEN];
-    unsigned char verify[VERIFY_LEN];
-
-    UserRecord *u = db_find_user(db, username);
-    if (!u) return -1;
-
-    if (derive_key(password, strlen(password), u->salt,
-                   enc_key, verify) != 0) {
-        return -1;
-    }
-
-    /* Constant-time comparison — prevents timing side-channel */
-    if (sodium_memcmp(verify, u->verify, VERIFY_LEN) != 0) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        sodium_memzero(verify,  VERIFY_LEN);
-        return -1;
-    }
-
-    memcpy(enc_key_out, enc_key, ENC_KEY_LEN);
-    sodium_memzero(enc_key, ENC_KEY_LEN);
-    sodium_memzero(verify,  VERIFY_LEN);
-    return 0;
-}
-
-/*
- * Build AEAD associated data: owner || '\0' || filename
- *
- * The NUL separator removes ambiguity (e.g. "ab"+"cd" vs "a"+"bcd").
- * Binding AD to the ciphertext means swapping records between
- * different owner/filename pairs will cause decryption to fail.
- */
-static unsigned char *build_ad(const char *owner, uint32_t owner_len,
-                                const char *filename, uint32_t filename_len,
-                                size_t *ad_len_out) {
-    size_t ad_len = (size_t)owner_len + 1 + (size_t)filename_len;
-    unsigned char *ad = malloc(ad_len);
-    if (!ad) return NULL;
-
-    memcpy(ad, owner, owner_len);
-    ad[owner_len] = '\0';
-    memcpy(ad + owner_len + 1, filename, filename_len);
-    *ad_len_out = ad_len;
-    return ad;
-}
-
-/* ================================================================
- * Command implementations
- * ================================================================ */
-
-/*
- * register — create a new user account.
- *   - Requires: -u and -k
- *   - Rejects duplicate usernames.
- *   - Generates random salt, derives key, stores verify token.
- */
-static int do_register(Database *db,
-                        const char *user, const char *key) {
-    UserRecord *new_users;
-    UserRecord *u;
-    unsigned char enc_key[ENC_KEY_LEN];
-
-    /* Reject duplicate */
-    if (db_find_user(db, user) != NULL) return -1;
-
-    /* Capacity check */
-    if (db->num_users >= MAX_RECORDS) return -1;
-
-    /* Grow users array */
-    new_users = realloc(db->users,
-                        (size_t)(db->num_users + 1) * sizeof(UserRecord));
-    if (!new_users) return -1;
-    db->users = new_users;
-
-    u = &db->users[db->num_users];
-    memset(u, 0, sizeof(UserRecord));
-
-    /* Username */
-    u->username_len = (uint32_t)strlen(user);
-    u->username = malloc((size_t)u->username_len + 1);
-    if (!u->username) return -1;
-    memcpy(u->username, user, (size_t)u->username_len + 1);
-
-    /* Random salt */
-    randombytes_buf(u->salt, SALT_LEN);
-
-    /* Key derivation */
-    if (derive_key(key, strlen(key), u->salt, enc_key, u->verify) != 0) {
-        free(u->username);
-        u->username = NULL;
-        return -1;
-    }
-
-    sodium_memzero(enc_key, ENC_KEY_LEN);
-    db->num_users++;
-    return 0;
-}
-
-/*
- * create — create an empty file owned by a user.
- *   - Requires: -u and -f
- *   - Does NOT require -k.
- *   - If the file already exists for this user: no-op (exit 0).
- *   - User must be registered.
- */
-static int do_create(Database *db,
-                      const char *user, const char *filename) {
-    FileRecord *new_files;
-    FileRecord *f;
-
-    /* User must exist */
-    if (db_find_user(db, user) == NULL) return -1;
-
-    /* Already exists → no-op */
-    if (db_find_file(db, user, filename) != NULL) return 0;
-
-    /* Capacity check */
-    if (db->num_files >= MAX_RECORDS) return -1;
-
-    /* Grow files array */
-    new_files = realloc(db->files,
-                        (size_t)(db->num_files + 1) * sizeof(FileRecord));
-    if (!new_files) return -1;
-    db->files = new_files;
-
-    f = &db->files[db->num_files];
-    memset(f, 0, sizeof(FileRecord));
-
-    /* Owner */
-    f->owner_len = (uint32_t)strlen(user);
-    f->owner = malloc((size_t)f->owner_len + 1);
-    if (!f->owner) return -1;
-    memcpy(f->owner, user, (size_t)f->owner_len + 1);
-
-    /* Filename */
-    f->filename_len = (uint32_t)strlen(filename);
-    f->filename = malloc((size_t)f->filename_len + 1);
-    if (!f->filename) {
-        free(f->owner);
-        f->owner = NULL;
-        return -1;
-    }
-    memcpy(f->filename, filename, (size_t)f->filename_len + 1);
-
-    /* Created with no content — ciphertext_len stays 0 */
-    db->num_files++;
-    return 0;
-}
-
-/*
- * write — encrypt and store content in a file.
- *   - Requires: -u, -k, -f
- *   - Content comes from -i file, positional arg, or empty string.
- *   - Authenticates the user's key before writing.
- *   - Encrypts with XChaCha20-Poly1305 AEAD.
- *   - Associated data = owner||'\0'||filename  (binds ciphertext to record).
- */
-static int do_write(Database *db,
-                     const char *user, const char *key,
-                     const char *filename,
-                     const unsigned char *content, size_t content_len) {
-    unsigned char enc_key[ENC_KEY_LEN];
-    FileRecord *f;
-    unsigned char *ad = NULL;
-    size_t ad_len;
-    unsigned char *ct = NULL;
-    unsigned long long ct_len;
-    size_t ct_buf_len;
-
-    /* Authenticate */
-    if (authenticate(db, user, key, enc_key) != 0)
-        return -1;
-
-    /* Find file — must have been created first */
-    f = db_find_file(db, user, filename);
-    if (!f) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Build associated data */
-    ad = build_ad(f->owner, f->owner_len, f->filename, f->filename_len,
-                  &ad_len);
-    if (!ad) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Fresh random nonce for every write */
-    randombytes_buf(f->nonce, NONCE_LEN);
-
-    /* Allocate ciphertext buffer  (plaintext + TAG_LEN) */
-    ct_buf_len = content_len + TAG_LEN;
-    ct = malloc(ct_buf_len > 0 ? ct_buf_len : 1);
-    if (!ct) {
-        free(ad);
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* AEAD encrypt */
-    if (crypto_aead_xchacha20poly1305_ietf_encrypt(
-            ct, &ct_len,
-            content, (unsigned long long)content_len,
-            ad, (unsigned long long)ad_len,
-            NULL,       /* nsec — unused by this construction */
-            f->nonce,
-            enc_key) != 0) {
-        free(ct);
-        free(ad);
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Replace old ciphertext */
-    if (f->ciphertext) {
-        sodium_memzero(f->ciphertext, f->ciphertext_len);
-        free(f->ciphertext);
-    }
-    f->ciphertext     = ct;
-    f->ciphertext_len = (uint32_t)ct_len;
-
-    free(ad);
-    sodium_memzero(enc_key, ENC_KEY_LEN);
-    return 0;
-}
-
-/*
- * read — decrypt and output a file's content.
- *   - Requires: -u, -k, -f
- *   - Output goes to -o file or stdout.
- *   - Authenticates the user's key, then AEAD-decrypts.
- */
-static int do_read(Database *db,
-                    const char *user, const char *key,
-                    const char *filename, const char *outfile) {
-    unsigned char enc_key[ENC_KEY_LEN];
-    FileRecord *f;
-    unsigned char *ad = NULL;
-    size_t ad_len;
-    unsigned char *pt = NULL;
-    unsigned long long pt_len;
-    FILE *fp;
-
-    /* Authenticate */
-    if (authenticate(db, user, key, enc_key) != 0)
-        return -1;
-
-    /* Find file */
-    f = db_find_file(db, user, filename);
-    if (!f) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Empty file (created but never written) → output nothing */
-    if (f->ciphertext_len == 0) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        if (outfile) {
-            fp = fopen(outfile, "wb");
-            if (!fp) return -1;
-            fclose(fp);
-        }
-        /* stdout: nothing to write */
+    if (memcmp(hash, db->users[idx].key_hash, 32) == 0) {
         return 0;
     }
-
-    /* Sanity: ciphertext must be at least TAG_LEN */
-    if (f->ciphertext_len < TAG_LEN) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Build associated data (must match what was used at encrypt time) */
-    ad = build_ad(f->owner, f->owner_len, f->filename, f->filename_len,
-                  &ad_len);
-    if (!ad) {
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* Allocate plaintext buffer */
-    pt = malloc(f->ciphertext_len);   /* at most ciphertext_len bytes */
-    if (!pt) {
-        free(ad);
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* AEAD decrypt — fails if ciphertext was tampered with */
-    if (crypto_aead_xchacha20poly1305_ietf_decrypt(
-            pt, &pt_len,
-            NULL,       /* nsec */
-            f->ciphertext, (unsigned long long)f->ciphertext_len,
-            ad, (unsigned long long)ad_len,
-            f->nonce,
-            enc_key) != 0) {
-        /* Authentication failed — tampered data or wrong key */
-        sodium_memzero(pt, f->ciphertext_len);
-        free(pt);
-        free(ad);
-        sodium_memzero(enc_key, ENC_KEY_LEN);
-        return -1;
-    }
-
-    /* ---- Output ---- */
-    if (outfile) {
-        fp = fopen(outfile, "wb");
-        if (!fp) {
-            sodium_memzero(pt, pt_len);
-            free(pt);
-            free(ad);
-            sodium_memzero(enc_key, ENC_KEY_LEN);
-            return -1;
-        }
-        if (pt_len > 0 && fwrite(pt, 1, (size_t)pt_len, fp) != (size_t)pt_len) {
-            fclose(fp);
-            sodium_memzero(pt, pt_len);
-            free(pt);
-            free(ad);
-            sodium_memzero(enc_key, ENC_KEY_LEN);
-            return -1;
-        }
-        fclose(fp);
-    } else {
-        /* stdout */
-        if (pt_len > 0) {
-            fwrite(pt, 1, (size_t)pt_len, stdout);
-        }
-    }
-
-    sodium_memzero(pt, pt_len);
-    free(pt);
-    free(ad);
-    sodium_memzero(enc_key, ENC_KEY_LEN);
-    return 0;
+    return -1;
 }
 
-/* ================================================================
- * Input reading (for the write command)
- *
- * Priority: -i file  >  positional arg  >  empty string
- * ================================================================ */
+static unsigned char *encrypt_data(const unsigned char *plaintext, int plaintext_len, const unsigned char *key, unsigned char *iv, unsigned char *tag, const char *username, const char *filename, int *out_len) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) return NULL;
+    
+    unsigned char *ciphertext = malloc(plaintext_len > 0 ? plaintext_len : 1);
+    if (!ciphertext) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+    
+    int len = 0, ciphertext_len = 0;
 
-static int read_content(const char *infile, const char *text,
-                         unsigned char **out, size_t *out_len) {
-    FILE *fp;
-    long fsize;
-    size_t size;
-    unsigned char *data;
-    size_t len;
-
-    if (infile) {
-        fp = fopen(infile, "rb");
-        if (!fp) return -1;
-
-        if (fseek(fp, 0, SEEK_END) != 0) { fclose(fp); return -1; }
-        fsize = ftell(fp);
-        if (fsize < 0)                      { fclose(fp); return -1; }
-        if ((size_t)fsize > MAX_CONTENT_LEN) { fclose(fp); return -1; }
-        if (fseek(fp, 0, SEEK_SET) != 0)     { fclose(fp); return -1; }
-
-        size = (size_t)fsize;
-        if (size == 0) {
-            fclose(fp);
-            *out     = NULL;
-            *out_len = 0;
-            return 0;
-        }
-
-        data = malloc(size);
-        if (!data) { fclose(fp); return -1; }
-
-        if (fread(data, 1, size, fp) != size) {
-            free(data);
-            fclose(fp);
-            return -1;
-        }
-        fclose(fp);
-
-        *out     = data;
-        *out_len = size;
-        return 0;
+    if (!RAND_bytes(iv, IV_SIZE)) {
+        EVP_CIPHER_CTX_free(ctx);
+        free(ciphertext);
+        return NULL;
     }
 
-    if (text) {
-        len = strlen(text);
-        if (len > MAX_CONTENT_LEN) return -1;
-
-        if (len == 0) {
-            *out     = NULL;
-            *out_len = 0;
-            return 0;
-        }
-
-        data = malloc(len);
-        if (!data) return -1;
-        memcpy(data, text, len);
-
-        *out     = data;
-        *out_len = len;
-        return 0;
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        free(ciphertext);
+        return NULL;
     }
+    
+    EVP_EncryptUpdate(ctx, NULL, &len, (unsigned char *)username, strlen(username));
+    EVP_EncryptUpdate(ctx, NULL, &len, (unsigned char *)filename, strlen(filename));
 
-    /* No source → empty content */
-    *out     = NULL;
-    *out_len = 0;
-    return 0;
+    if (plaintext_len > 0) {
+        EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len);
+        ciphertext_len = len;
+    }
+    
+    EVP_EncryptFinal_ex(ctx, ciphertext + len, &len);
+    ciphertext_len += len;
+
+    EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag);
+
+    EVP_CIPHER_CTX_free(ctx);
+    *out_len = ciphertext_len;
+    return ciphertext;
 }
 
-/* ================================================================
- * main
- * ================================================================ */
+static unsigned char *decrypt_data(const unsigned char *ciphertext, int ciphertext_len, const unsigned char *key, const unsigned char *iv, const unsigned char *tag, const char *username, const char *filename, int *out_len) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) return NULL;
+    
+    unsigned char *plaintext = malloc(ciphertext_len > 0 ? ciphertext_len : 1);
+    if (!plaintext) {
+        EVP_CIPHER_CTX_free(ctx);
+        return NULL;
+    }
+    
+    int len = 0, plaintext_len = 0;
+
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        free(plaintext);
+        return NULL;
+    }
+    
+    EVP_DecryptUpdate(ctx, NULL, &len, (unsigned char *)username, strlen(username));
+    EVP_DecryptUpdate(ctx, NULL, &len, (unsigned char *)filename, strlen(filename));
+
+    if (ciphertext_len > 0) {
+        EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len);
+        plaintext_len = len;
+    }
+
+    EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, (void *)tag);
+
+    int ret = EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
+    EVP_CIPHER_CTX_free(ctx);
+
+    if (ret <= 0) {
+        free(plaintext);
+        return NULL;
+    }
+
+    plaintext_len += len;
+    *out_len = plaintext_len;
+    return plaintext;
+}
 
 int main(int argc, char **argv) {
-    char *user    = NULL;
-    char *key     = NULL;
-    char *file    = NULL;
-    char *infile  = NULL;
-    char *outfile = NULL;
-    int c;
-    const char *action;
-    const char *content_arg;
     Database db;
-    int result;
+    db.users = NULL;
+    db.files = NULL;
+    db.file_data = NULL;
+    db.user_count = 0;
+    db.file_count = 0;
 
-    /* Initialize libsodium */
-    if (sodium_init() < 0)
-        return invalid();
+#define ERROR_OUT() do { db_free(&db); return invalid(); } while(0)
+#define SUCCESS_OUT() do { db_free(&db); return 0; } while(0)
 
-    /* ---- Parse arguments ---- */
+    char *user = NULL, *key = NULL, *file = NULL;
+    char *infile = NULL, *outfile = NULL;
+    int c;
+
     while ((c = getopt(argc, argv, "u:k:f:i:o:")) != -1) {
         switch (c) {
             case 'u': user    = optarg; break;
@@ -928,108 +314,198 @@ int main(int argc, char **argv) {
             case 'f': file    = optarg; break;
             case 'i': infile  = optarg; break;
             case 'o': outfile = optarg; break;
-            default:  return invalid();
+            default:  ERROR_OUT();
         }
     }
 
-    /* Validate: -u is always required, action is always required */
-    if (!user)                        return invalid();
-    if (strlen(user) == 0)            return invalid();
-    if (strlen(user) > MAX_STR_LEN)   return invalid();
-    if (optind >= argc)               return invalid();
+    if (!user) ERROR_OUT();
+    if (optind >= argc) ERROR_OUT();
 
-    action      = argv[optind];
-    content_arg = (optind + 1 < argc) ? argv[optind + 1] : NULL;
+    const char *action  = argv[optind];
+    const char *content = (optind + 1 < argc) ? argv[optind + 1] : NULL;
 
-    /* ---- Load database ---- */
-    if (db_load(&db) != 0)
-        return invalid();
+    if (db_load(&db) < 0) ERROR_OUT();
 
-    result = -1;
-
-    /* ---- Dispatch ---- */
     if (strcmp(action, "register") == 0) {
-        /* register: requires -u and -k */
-        if (!key || strlen(key) == 0) {
-            db_free(&db);
-            return invalid();
+        if (!key) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(key) >= MAX_NAME) ERROR_OUT();
+
+        int idx = db_find_user(&db, user);
+        if (idx >= 0) {
+            ERROR_OUT();
+        } else {
+            User *new_users = realloc(db.users, (db.user_count + 1) * sizeof(User));
+            if (!new_users) ERROR_OUT();
+            db.users = new_users;
+            
+            memset(&db.users[db.user_count], 0, sizeof(User));
+            strcpy(db.users[db.user_count].username, user);
+            if (!RAND_bytes(db.users[db.user_count].salt, SALT_SIZE)) ERROR_OUT();
+            hash_key(key, db.users[db.user_count].salt, db.users[db.user_count].key_hash);
+            db.user_count++;
         }
 
-        result = do_register(&db, user, key);
-        if (result == 0) {
-            if (db_save(&db) != 0) {
-                db_free(&db);
-                return invalid();
-            }
-        }
-
-    } else if (strcmp(action, "create") == 0) {
-        /* create: requires -u and -f; does NOT require -k */
-        if (!file || strlen(file) == 0 || strlen(file) > MAX_STR_LEN) {
-            db_free(&db);
-            return invalid();
-        }
-
-        result = do_create(&db, user, file);
-        if (result == 0) {
-            if (db_save(&db) != 0) {
-                db_free(&db);
-                return invalid();
-            }
-        }
-
-    } else if (strcmp(action, "write") == 0) {
-        /* write: requires -u, -k, -f */
-        unsigned char *content_data = NULL;
-        size_t content_len = 0;
-
-        if (!key  || strlen(key)  == 0 ||
-            !file || strlen(file) == 0 || strlen(file) > MAX_STR_LEN) {
-            db_free(&db);
-            return invalid();
-        }
-
-        if (read_content(infile, content_arg, &content_data, &content_len) != 0) {
-            db_free(&db);
-            return invalid();
-        }
-
-        result = do_write(&db, user, key, file,
-                           content_data ? content_data : (const unsigned char *)"",
-                           content_len);
-
-        if (content_data) {
-            sodium_memzero(content_data, content_len);
-            free(content_data);
-        }
-
-        if (result == 0) {
-            if (db_save(&db) != 0) {
-                db_free(&db);
-                return invalid();
-            }
-        }
-
-    } else if (strcmp(action, "read") == 0) {
-        /* read: requires -u, -k, -f */
-        if (!key  || strlen(key)  == 0 ||
-            !file || strlen(file) == 0 || strlen(file) > MAX_STR_LEN) {
-            db_free(&db);
-            return invalid();
-        }
-
-        result = do_read(&db, user, key, file, outfile);
-
-    } else {
-        /* Unknown action */
-        db_free(&db);
-        return invalid();
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
     }
 
-    db_free(&db);
+    if (strcmp(action, "create") == 0) {
+        if (!file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
 
-    if (result != 0)
-        return invalid();
+        int idx = db_find_user(&db, user);
+        if (idx < 0) ERROR_OUT();
 
-    return 0;
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx >= 0) {
+            SUCCESS_OUT();
+        }
+
+        FileMeta *new_files = realloc(db.files, (db.file_count + 1) * sizeof(FileMeta));
+        if (!new_files) ERROR_OUT();
+        db.files = new_files;
+        
+        unsigned char **new_file_data = realloc(db.file_data, (db.file_count + 1) * sizeof(unsigned char *));
+        if (!new_file_data) ERROR_OUT();
+        db.file_data = new_file_data;
+
+        memset(&db.files[db.file_count], 0, sizeof(FileMeta));
+        strcpy(db.files[db.file_count].username, user);
+        strcpy(db.files[db.file_count].filename, file);
+        db.files[db.file_count].encrypted_len = 0;
+        db.file_data[db.file_count] = NULL;
+        db.file_count++;
+
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
+    }
+
+    if (strcmp(action, "write") == 0) {
+        if (!key || !file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
+
+        if (verify_key(&db, user, key) < 0) ERROR_OUT();
+
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx < 0) ERROR_OUT();
+
+        unsigned char *plaintext = NULL;
+        long plaintext_len = 0;
+
+        if (infile) {
+            FILE *f = fopen(infile, "rb");
+            if (!f) ERROR_OUT();
+            
+            fseek(f, 0, SEEK_END);
+            plaintext_len = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            
+            if (plaintext_len < 0) {
+                fclose(f);
+                ERROR_OUT();
+            }
+
+            if (plaintext_len > 0) {
+                plaintext = malloc(plaintext_len);
+                if (!plaintext) {
+                    fclose(f);
+                    ERROR_OUT();
+                }
+                if (fread(plaintext, 1, plaintext_len, f) != (size_t)plaintext_len) {
+                    free(plaintext);
+                    fclose(f);
+                    ERROR_OUT();
+                }
+            }
+            fclose(f);
+        } else if (content) {
+            plaintext_len = strlen(content);
+            if (plaintext_len > 0) {
+                plaintext = malloc(plaintext_len);
+                if (!plaintext) ERROR_OUT();
+                memcpy(plaintext, content, plaintext_len);
+            }
+        }
+
+        int idx = db_find_user(&db, user);
+        unsigned char key_hash[32];
+        hash_key(key, db.users[idx].salt, key_hash);
+
+        int enc_len = 0;
+        unsigned char *encrypted = encrypt_data(plaintext, plaintext_len, key_hash, db.files[file_idx].iv, db.files[file_idx].tag, user, file, &enc_len);
+        
+        if (plaintext) free(plaintext);
+
+        if (!encrypted && plaintext_len >= 0) ERROR_OUT();
+
+        if (db.file_data[file_idx]) {
+            free(db.file_data[file_idx]);
+        }
+        db.file_data[file_idx] = encrypted;
+        db.files[file_idx].encrypted_len = enc_len;
+
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
+    }
+
+    if (strcmp(action, "read") == 0) {
+        if (!key || !file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
+
+        if (verify_key(&db, user, key) < 0) ERROR_OUT();
+
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx < 0) ERROR_OUT();
+
+        int idx = db_find_user(&db, user);
+        unsigned char key_hash[32];
+        hash_key(key, db.users[idx].salt, key_hash);
+
+        int plaintext_len = 0;
+        unsigned char *plaintext = NULL;
+        
+        if (db.files[file_idx].encrypted_len >= 0 && db.file_data[file_idx]) {
+            plaintext = decrypt_data(db.file_data[file_idx],
+                                     db.files[file_idx].encrypted_len,
+                                     key_hash,
+                                     db.files[file_idx].iv,
+                                     db.files[file_idx].tag,
+                                     user,
+                                     file,
+                                     &plaintext_len);
+                                     
+            if (!plaintext) ERROR_OUT();
+        } else if (db.files[file_idx].encrypted_len == 0 && !db.file_data[file_idx]) {
+            // It's possible to read an empty file that was created but never written to.
+            // In that case, we can just return empty.
+            plaintext_len = 0;
+        } else {
+            ERROR_OUT();
+        }
+
+        if (outfile) {
+            FILE *f = fopen(outfile, "wb");
+            if (!f) {
+                if (plaintext) free(plaintext);
+                ERROR_OUT();
+            }
+            if (plaintext_len > 0) {
+                if (fwrite(plaintext, 1, plaintext_len, f) != (size_t)plaintext_len) {
+                    if (plaintext) free(plaintext);
+                    fclose(f);
+                    ERROR_OUT();
+                }
+            }
+            fclose(f);
+        } else {
+            if (plaintext_len > 0) {
+                fwrite(plaintext, 1, plaintext_len, stdout);
+            }
+        }
+
+        if (plaintext) free(plaintext);
+        SUCCESS_OUT();
+    }
+
+    ERROR_OUT();
 }
