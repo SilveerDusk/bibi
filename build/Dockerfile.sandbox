@@ -1,22 +1,22 @@
 # BiBiFi Sandbox — Ubuntu 18.04 with all build dependencies
 #
 # Build:
-#   docker build -t bibifi-sandbox -f Dockerfile.sandbox .
+#   docker build --platform=linux/amd64 -t bibifi-sandbox -f Dockerfile.sandbox .
 #
 # Run (interactive):
-#   docker run --rm -it -v $(pwd)/build:/connect bibifi-sandbox
+#   docker run --rm -it --platform=linux/amd64 -v $(pwd)/build:/connect bibifi-sandbox
 #
 # This drops you into a shell where /connect contains your build/ directory.
 # Run `make` to compile, then use the test commands from tests.json to verify.
 
-FROM ubuntu:18.04
+FROM --platform=linux/amd64 ubuntu:18.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get dist-upgrade -y
 
 # Core build tools
-RUN apt-get install -y build-essential gcc make sudo
+RUN apt-get install -y build-essential gcc make sudo software-properties-common
 
 # BiBiFi build dependencies
 RUN apt-get install -y \
@@ -47,4 +47,3 @@ RUN rm -rf /var/lib/apt/lists/*
 WORKDIR /connect
 
 ENTRYPOINT ["/bin/bash"]
-
