@@ -56,10 +56,10 @@ Implement a CLI encrypted file store with these commands:
 
 ```bash
 # Build the sandbox image (one-time)
-docker build -t bibifi-sandbox -f Dockerfile.sandbox .
+docker build --platform=linux/amd64 -t bibifi-sandbox -f Dockerfile.sandbox .
 
 # Run interactively — your build/ dir is mounted at /connect
-docker run --rm -it -v $(pwd)/build:/connect bibifi-sandbox
+docker run --rm -it --platform=linux/amd64 -v $(pwd)/build:/connect bibifi-sandbox
 
 # Inside the container:
 make
@@ -152,4 +152,3 @@ Push your implementation to your team's GitHub repo:
 - Check `ONESHOT_PROMPT.md` for quick reference
 - Test manually using the example commands above
 - Use `rm -f enc.db` between test runs to reset state
-
