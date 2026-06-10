@@ -9,7 +9,7 @@
 # This drops you into a shell where /connect contains your build/ directory.
 # Run `make` to compile, then use the test commands from tests.json to verify.
 
-FROM ubuntu:18.04
+FROM --platform=linux/amd64 ubuntu:18.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -37,7 +37,7 @@ RUN apt-get update
 RUN apt-get install -y libssl-dev:i386 libsodium-dev:i386
 
 # execstack (contest requires executable stack)
-RUN add-apt-repository universe && apt-get update && apt-get install -y execstack
+RUN apt-get update && apt-get install -y software-properties-common && add-apt-repository universe && apt-get update && apt-get install -y execstack
 
 # Avoid entropy blocking in containers
 RUN rm /dev/random && ln -s /dev/urandom /dev/random
