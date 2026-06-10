@@ -53,64 +53,85 @@ static void hash_key(const char *key, const unsigned char *salt, unsigned char *
     PKCS5_PBKDF2_HMAC(key, strlen(key), salt, SALT_SIZE, PBKDF2_ITERATIONS, EVP_sha256(), 32, hash);
 }
 
-static int db_load(Database *db) {
-    FILE *f = fopen(DB_FILE, "rb");
-    if (!f) {
+static void db_free(Database *db) {
+    if (db->users) {
+        free(db->users);
         db->users = NULL;
-        db->user_count = 0;
-        db->files = NULL;
-        db->file_data = NULL;
-        db->file_count = 0;
-        return 0;
     }
+    if (db->file_data) {
+        for (int i = 0; i < db->file_count; i++) {
+            if (db->file_data[i]) {
+                free(db->file_data[i]);
+                db->file_data[i] = NULL;
+            }
+        }
+        free(db->file_data);
+        db->file_data = NULL;
+    }
+    if (db->files) {
+        free(db->files);
+        db->files = NULL;
+    }
+    db->user_count = 0;
+    db->file_count = 0;
+}
+
+static int db_load(Database *db) {
+    db->users = NULL;
+    db->user_count = 0;
+    db->files = NULL;
+    db->file_data = NULL;
+    db->file_count = 0;
+
+    FILE *f = fopen(DB_FILE, "rb");
+    if (!f) return 0;
 
     if (fread(&db->user_count, sizeof(int), 1, f) != 1) {
         fclose(f);
+        db_free(db);
         return -1;
     }
 
     if (db->user_count > 0) {
         db->users = malloc(db->user_count * sizeof(User));
-        if (!db->users) { fclose(f); return -1; }
+        if (!db->users) { fclose(f); db_free(db); return -1; }
         if (fread(db->users, sizeof(User), db->user_count, f) != (size_t)db->user_count) {
             fclose(f);
+            db_free(db);
             return -1;
         }
-    } else {
-        db->users = NULL;
     }
 
     if (fread(&db->file_count, sizeof(int), 1, f) != 1) {
         fclose(f);
+        db_free(db);
         return -1;
     }
 
     if (db->file_count > 0) {
         db->files = malloc(db->file_count * sizeof(FileMeta));
-        if (!db->files) { fclose(f); return -1; }
-        db->file_data = malloc(db->file_count * sizeof(unsigned char *));
-        if (!db->file_data) { fclose(f); return -1; }
+        if (!db->files) { fclose(f); db_free(db); return -1; }
+        
+        db->file_data = calloc(db->file_count, sizeof(unsigned char *));
+        if (!db->file_data) { fclose(f); db_free(db); return -1; }
 
         for (int i = 0; i < db->file_count; i++) {
             if (fread(&db->files[i], sizeof(FileMeta), 1, f) != 1) {
                 fclose(f);
+                db_free(db);
                 return -1;
             }
 
             if (db->files[i].encrypted_len > 0) {
                 db->file_data[i] = malloc(db->files[i].encrypted_len);
-                if (!db->file_data[i]) { fclose(f); return -1; }
+                if (!db->file_data[i]) { fclose(f); db_free(db); return -1; }
                 if (fread(db->file_data[i], 1, db->files[i].encrypted_len, f) != (size_t)db->files[i].encrypted_len) {
                     fclose(f);
+                    db_free(db);
                     return -1;
                 }
-            } else {
-                db->file_data[i] = NULL;
             }
         }
-    } else {
-        db->files = NULL;
-        db->file_data = NULL;
     }
 
     fclose(f);
@@ -272,6 +293,16 @@ static unsigned char *decrypt_data(const unsigned char *ciphertext, int cipherte
 }
 
 int main(int argc, char **argv) {
+    Database db;
+    db.users = NULL;
+    db.files = NULL;
+    db.file_data = NULL;
+    db.user_count = 0;
+    db.file_count = 0;
+
+#define ERROR_OUT() do { db_free(&db); return invalid(); } while(0)
+#define SUCCESS_OUT() do { db_free(&db); return 0; } while(0)
+
     char *user = NULL, *key = NULL, *file = NULL;
     char *infile = NULL, *outfile = NULL;
     int c;
@@ -283,60 +314,59 @@ int main(int argc, char **argv) {
             case 'f': file    = optarg; break;
             case 'i': infile  = optarg; break;
             case 'o': outfile = optarg; break;
-            default:  return invalid();
+            default:  ERROR_OUT();
         }
     }
 
-    if (!user) return invalid();
-    if (optind >= argc) return invalid();
+    if (!user) ERROR_OUT();
+    if (optind >= argc) ERROR_OUT();
 
     const char *action  = argv[optind];
     const char *content = (optind + 1 < argc) ? argv[optind + 1] : NULL;
 
-    Database db;
-    if (db_load(&db) < 0) return invalid();
+    if (db_load(&db) < 0) ERROR_OUT();
 
     if (strcmp(action, "register") == 0) {
-        if (!key) return invalid();
-        if (strlen(user) >= MAX_NAME || strlen(key) >= MAX_NAME) return invalid();
+        if (!key) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(key) >= MAX_NAME) ERROR_OUT();
 
         int idx = db_find_user(&db, user);
         if (idx >= 0) {
-            return invalid();
+            ERROR_OUT();
         } else {
             User *new_users = realloc(db.users, (db.user_count + 1) * sizeof(User));
-            if (!new_users) return invalid();
+            if (!new_users) ERROR_OUT();
             db.users = new_users;
             
             memset(&db.users[db.user_count], 0, sizeof(User));
             strcpy(db.users[db.user_count].username, user);
-            if (!RAND_bytes(db.users[db.user_count].salt, SALT_SIZE)) return invalid();
+            if (!RAND_bytes(db.users[db.user_count].salt, SALT_SIZE)) ERROR_OUT();
             hash_key(key, db.users[db.user_count].salt, db.users[db.user_count].key_hash);
             db.user_count++;
         }
 
-        if (db_save(&db) < 0) return invalid();
-        return 0;
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
     }
 
     if (strcmp(action, "create") == 0) {
-        if (!file) return invalid();
-        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) return invalid();
+        if (!file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
 
         int idx = db_find_user(&db, user);
-        if (idx < 0) return invalid();
+        if (idx < 0) ERROR_OUT();
 
         int file_idx = db_find_file(&db, user, file);
         if (file_idx >= 0) {
-            return 0;
+            SUCCESS_OUT();
         }
 
         FileMeta *new_files = realloc(db.files, (db.file_count + 1) * sizeof(FileMeta));
-        if (!new_files) return invalid();
+        if (!new_files) ERROR_OUT();
         db.files = new_files;
         
         unsigned char **new_file_data = realloc(db.file_data, (db.file_count + 1) * sizeof(unsigned char *));
-        if (!new_file_data) return invalid();
+        if (!new_file_data) ERROR_OUT();
         db.file_data = new_file_data;
 
         memset(&db.files[db.file_count], 0, sizeof(FileMeta));
@@ -346,25 +376,25 @@ int main(int argc, char **argv) {
         db.file_data[db.file_count] = NULL;
         db.file_count++;
 
-        if (db_save(&db) < 0) return invalid();
-        return 0;
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
     }
 
     if (strcmp(action, "write") == 0) {
-        if (!key || !file) return invalid();
-        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) return invalid();
+        if (!key || !file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
 
-        if (verify_key(&db, user, key) < 0) return invalid();
+        if (verify_key(&db, user, key) < 0) ERROR_OUT();
 
         int file_idx = db_find_file(&db, user, file);
-        if (file_idx < 0) return invalid();
+        if (file_idx < 0) ERROR_OUT();
 
         unsigned char *plaintext = NULL;
         long plaintext_len = 0;
 
         if (infile) {
             FILE *f = fopen(infile, "rb");
-            if (!f) return invalid();
+            if (!f) ERROR_OUT();
             
             fseek(f, 0, SEEK_END);
             plaintext_len = ftell(f);
@@ -372,19 +402,19 @@ int main(int argc, char **argv) {
             
             if (plaintext_len < 0) {
                 fclose(f);
-                return invalid();
+                ERROR_OUT();
             }
 
             if (plaintext_len > 0) {
                 plaintext = malloc(plaintext_len);
                 if (!plaintext) {
                     fclose(f);
-                    return invalid();
+                    ERROR_OUT();
                 }
                 if (fread(plaintext, 1, plaintext_len, f) != (size_t)plaintext_len) {
                     free(plaintext);
                     fclose(f);
-                    return invalid();
+                    ERROR_OUT();
                 }
             }
             fclose(f);
@@ -392,7 +422,7 @@ int main(int argc, char **argv) {
             plaintext_len = strlen(content);
             if (plaintext_len > 0) {
                 plaintext = malloc(plaintext_len);
-                if (!plaintext) return invalid();
+                if (!plaintext) ERROR_OUT();
                 memcpy(plaintext, content, plaintext_len);
             }
         }
@@ -406,7 +436,7 @@ int main(int argc, char **argv) {
         
         if (plaintext) free(plaintext);
 
-        if (!encrypted && plaintext_len >= 0) return invalid();
+        if (!encrypted && plaintext_len >= 0) ERROR_OUT();
 
         if (db.file_data[file_idx]) {
             free(db.file_data[file_idx]);
@@ -414,18 +444,18 @@ int main(int argc, char **argv) {
         db.file_data[file_idx] = encrypted;
         db.files[file_idx].encrypted_len = enc_len;
 
-        if (db_save(&db) < 0) return invalid();
-        return 0;
+        if (db_save(&db) < 0) ERROR_OUT();
+        SUCCESS_OUT();
     }
 
     if (strcmp(action, "read") == 0) {
-        if (!key || !file) return invalid();
-        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) return invalid();
+        if (!key || !file) ERROR_OUT();
+        if (strlen(user) >= MAX_NAME || strlen(file) >= MAX_NAME) ERROR_OUT();
 
-        if (verify_key(&db, user, key) < 0) return invalid();
+        if (verify_key(&db, user, key) < 0) ERROR_OUT();
 
         int file_idx = db_find_file(&db, user, file);
-        if (file_idx < 0) return invalid();
+        if (file_idx < 0) ERROR_OUT();
 
         int idx = db_find_user(&db, user);
         unsigned char key_hash[32];
@@ -444,26 +474,26 @@ int main(int argc, char **argv) {
                                      file,
                                      &plaintext_len);
                                      
-            if (!plaintext) return invalid();
+            if (!plaintext) ERROR_OUT();
         } else if (db.files[file_idx].encrypted_len == 0 && !db.file_data[file_idx]) {
             // It's possible to read an empty file that was created but never written to.
             // In that case, we can just return empty.
             plaintext_len = 0;
         } else {
-            return invalid();
+            ERROR_OUT();
         }
 
         if (outfile) {
             FILE *f = fopen(outfile, "wb");
             if (!f) {
                 if (plaintext) free(plaintext);
-                return invalid();
+                ERROR_OUT();
             }
             if (plaintext_len > 0) {
                 if (fwrite(plaintext, 1, plaintext_len, f) != (size_t)plaintext_len) {
                     if (plaintext) free(plaintext);
                     fclose(f);
-                    return invalid();
+                    ERROR_OUT();
                 }
             }
             fclose(f);
@@ -474,8 +504,8 @@ int main(int argc, char **argv) {
         }
 
         if (plaintext) free(plaintext);
-        return 0;
+        SUCCESS_OUT();
     }
 
-    return invalid();
+    ERROR_OUT();
 }
