@@ -1,0 +1,47 @@
+{
+  "target_team": 101,
+  "type": "crash",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "f",
+        "create"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "rm -f /tmp/stor_fifo && mkfifo /tmp/stor_fifo"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "f",
+        "-i",
+        "/tmp/stor_fifo",
+        "write"
+      ]
+    }
+  ]
+}

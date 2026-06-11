@@ -1,0 +1,9 @@
+register-no-key — turnaround of an attack used against us, targeting team 114 (uw)
+Type: correctness
+Confidence: LOW (differs from reference only by a trailing newline on 'invalid' — valid only if the grader compares stdout byte-exactly; rejected if it trims)
+
+Dynamically observed in bibifi-sandbox (oracle = build/ per instruction):
+  This (team,probe) was flagged as the target diverging from the build/ oracle.
+Origin: replicates the class of break tested against CPSLO-108 (see attacker-info/).
+NOTE: oracle used = build/ (build/stor.c). For 'long-*' probes the grader's
+reference (build/stor-old.c, MAX_STR_LEN=4096) may differ — verify before submit.

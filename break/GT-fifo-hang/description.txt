@@ -1,0 +1,9 @@
+fifo-hang — turnaround of an attack used against us, targeting team 101 (GT)
+Type: crash
+Confidence: HIGH (crash: write -i <FIFO> blocks >60s; confirmed TIMEOUT in sandbox)
+
+Dynamically observed in bibifi-sandbox (oracle = build/ per instruction):
+  This (team,probe) was flagged as the target diverging from the build/ oracle.
+Origin: replicates the class of break tested against CPSLO-108 (see attacker-info/).
+NOTE: oracle used = build/ (build/stor.c). For 'long-*' probes the grader's
+reference (build/stor-old.c, MAX_STR_LEN=4096) may differ — verify before submit.

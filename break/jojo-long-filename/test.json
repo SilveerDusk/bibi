@@ -1,0 +1,36 @@
+{
+  "target_team": 109,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "secret",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "create"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "stdout": "",
+      "exit": 0
+    },
+    {
+      "stdout": "invalid",
+      "exit": 255
+    }
+  ]
+}

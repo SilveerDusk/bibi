@@ -1,0 +1,9 @@
+long-username — turnaround of an attack used against us, targeting team 114 (uw)
+Type: correctness
+Confidence: CONTESTED (build/ oracle rejects a 256-char value, but jojo's #978/#979/#980 were judged VALID against us, implying the grader's reference ACCEPTS 256-char. If so this is INVALID. VERIFY against build/stor-old.c before submitting)
+
+Dynamically observed in bibifi-sandbox (oracle = build/ per instruction):
+  This (team,probe) was flagged as the target diverging from the build/ oracle.
+Origin: replicates the class of break tested against CPSLO-108 (see attacker-info/).
+NOTE: oracle used = build/ (build/stor.c). For 'long-*' probes the grader's
+reference (build/stor-old.c, MAX_STR_LEN=4096) may differ — verify before submit.
