@@ -2,8 +2,6 @@
   "target_team": 101,
   "type": "integrity",
   "commands": [
-    {"program": "stor", "args": ["-u", "user1", "-k", "attacker_owns_you", "register"]},
-    {"program": "stor", "args": ["-u", "user1", "-f", "file1", "create"]},
-    {"program": "stor", "args": ["-u", "user1", "-k", "attacker_owns_you", "-f", "file1", "write", "PWNED_BY_ATTACKER"]}
+    {"program": "stor", "args": ["-u", "user1", "-k", "attacker_pw", "register"]}
   ]
 }

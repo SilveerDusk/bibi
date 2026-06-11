@@ -4,8 +4,37 @@ Generated from static source review of every target's `stor.c` + `enc.db`, then
 validated against the authoritative reference (`starter-package/build/stor.c`)
 and functionality suite (`tests.json`). CPSLO-108 ships no source, so 11 targets.
 
-Binaries are 32-bit Linux ELF; this host is macOS, so analysis is static. Build
-locally with `Dockerfile.sandbox` to confirm memory-corruption ideas dynamically.
+Binaries are 32-bit Linux ELF; this host is macOS. Static analysis was confirmed
+**dynamically** in the `bibifi-sandbox` Docker image (Ubuntu 18.04 / linux-amd64).
+
+## Dynamic verification (sandbox) — ALL live breaks confirmed against freshly built binaries
+
+Built with: `docker build --platform=linux/amd64 -t bibifi-sandbox -f Dockerfile.sandbox .`
+Harness: `build/break_runner.py` compiles a target + the reference oracle, replays a
+test.json against both, and reports per-command stdout/exit + whether they differ.
+
+Run a correctness break vs the oracle:
+```
+docker run --rm --platform=linux/amd64 -v "$(pwd)":/repo -w /repo bibifi-sandbox -c \
+  'python3 /repo/build/break_runner.py \
+     --target-src "/repo/break-it-code/SMK-112/source/*/build" \
+     --test /repo/break_drafts/SMK-112/correctness-reregister-allowed/test.json'
+```
+
+Confirmed results:
+- **Integrity (SMK, GT, TPT, Husker)**: simulated the full grader scenario with a
+  known key — real-key read returns `ORIGINAL_INTEGRITY_FLAG` before the attack and
+  `invalid`/255 after the keyless `register user1`. Original content unrecoverable. ✅
+- **Correctness re-register (×4)**: cmd[1] `register atk` again → target exit 0,
+  oracle `invalid`/255. Differs on exit code (robust to whitespace trimming). ✅
+- **UW_Tacoma re-create**: 2nd `create note` → target `invalid\n`/255, oracle ``/0.
+  Differs on exit code. ✅
+- **jojo write "read"**: write step → target `invalid`/255, oracle 0; read step →
+  oracle prints `read`, target prints nothing. Differs on exit + stdout. ✅
+- **via `register register`**: target `invalid\n`/255, oracle ``/0. Differs on exit. ✅
+- **Trailing-newline (UW, jojo, via)**: target `invalid\n` vs oracle `invalid`; exit
+  codes BOTH 255 — so the ONLY difference is the newline. VALID iff the grader does
+  byte-exact stdout comparison; INVALID if it trims. (`DIFFERS(trimmed)=False`.) ⚠
 
 ## How the grader judges (recap)
 - **correctness (25)**: target stdout/exit differs from the reference oracle.
