@@ -1,0 +1,46 @@
+CORRECTNESS BREAK — re-create of an existing file errors instead of succeeding
+
+Root cause
+----------
+The reference implementation treats `create` of an already-existing
+(owner, filename) pair as an idempotent no-op that SUCCEEDS:
+
+    starter-package/build/stor.c:359-362
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx >= 0) {
+            SUCCESS_OUT();              // prints nothing, exit 0
+        }
+
+The UW_Tacoma target instead treats it as a hard error:
+
+    UW_Tacoma-114/.../build/stor.c:529  (cmd_create)
+        if (db_find_file(db, username, filename)) die_invalid();
+
+    die_invalid()  (stor.c:34-37)
+        printf("invalid\n"); exit(255);
+
+So issuing `create` twice for the same user+file diverges:
+  - oracle:  exit 0, stdout ""
+  - target:  exit 255, stdout "invalid\n"
+
+Trigger
+-------
+Uses a freshly-registered attacker account (allowed by the rules; needs no
+victim key and does not touch the shipped user1/user2 records):
+
+  1. register attacker "atk" with key "s"        -> exit 0, ""
+  2. create file "note" for "atk"                -> exit 0, "" (file now exists)
+  3. create file "note" for "atk" AGAIN          -> DIVERGES
+
+On step 3 the oracle returns exit 0 with empty stdout (idempotent success),
+while the target prints "invalid" and exits 255.
+
+The "expected" array encodes the oracle behavior. The correctness grader
+compares the target run against this oracle and flags the mismatch on the
+third command.
+
+Confidence: HIGH for the behavioral divergence (the target source
+unambiguously calls die_invalid() on a duplicate create, line 529). The only
+residual assumption is that the grader's "correct oracle" matches the shipped
+starter-package reference semantics (idempotent-success create), which is the
+canonical reference implementation distributed to all teams.
