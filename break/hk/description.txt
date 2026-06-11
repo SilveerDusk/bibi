@@ -1,1 +1,25 @@
-tbh idk
+## Correctness Bug: Reading an Unwritten File Returns Spurious Newline
+ 
+### Bug Location
+`do_read()` in stor.c:
+ 
+```c
+if (!sf->has_crypto) {
+    if (args->outputfile) {
+        if (!write_whole_file_new(args->outputfile, (const unsigned char *)"", 0)) return invalid();
+    } else {
+        printf("\n");   // <-- spurious newline
+    }
+    return 0;
+}
+```
+ 
+### Bug Description
+When a file has been `create`d but never `write`n to (`has_crypto == 0`), reading it should return empty output. Instead, the implementation unconditionally calls `printf("\n")`, outputting a newline byte (`\n`) to stdout.
+ 
+The file's content is empty (no bytes were ever written). The correct output should be empty (zero bytes), matching the semantic "read a file's content" from the spec. A newline is extraneous output that was never part of the file's data.
+ 
+By contrast, when a file HAS been written, the output is `content + printf("\n")` — so the newline is added both for written and unwritten files, which is internally consistent but arguably wrong: the trailing newline is an artifact of the program's formatting, not part of the stored data.
+ 
+### Test
+Register user1, create `emptyfile` (no write), then read it. Expected output per spec is empty string (the file has no content). This implementation outputs `\n`.

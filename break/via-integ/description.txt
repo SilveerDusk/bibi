@@ -1,0 +1,42 @@
+# Vulnerability: Unauthenticated has_crypto Flag in enc.db
+ 
+### Bug Location
+`do_read()` in stor.c, specifically the `has_crypto` check:
+ 
+```c
+if (!sf->has_crypto) {
+    if (args->outputfile) {
+        if (!write_whole_file_new(args->outputfile, (const unsigned char *)"", 0)) return invalid();
+    } else {
+        printf("\n");
+    }
+    return 0;
+}
+```
+ 
+### Root Cause
+The database format stores file encryption state as a flag encoded in the F line:
+- Encrypted: `F <user_id> <file_id> <nonce_hex> <data_hex> <tag_hex>`
+- Not written: `F <user_id> <file_id> - - -`
+ 
+When `nonce/data/tag` are all `-`, `has_crypto` is set to 0 on load. When `do_read` encounters `has_crypto=0`, it **skips the tag/integrity verification entirely** and returns an empty string — without ever checking the HMAC tag that was computed when the file was written.
+ 
+The HMAC authentication tag (`sf->tag`) is specifically designed to detect tampering, but it is only checked when `has_crypto == 1`. The `has_crypto` flag itself is **not protected by any MAC or signature** — it is derived purely from the presence of `-` tokens in the plaintext database file.
+ 
+### Attack
+1. Obtain `enc.db` (provided in the break package).
+2. Compute the deterministic `user_id` for "user1" and `file_id` for "user1/file1" using the hardcoded pepper in the source:
+   - `user1_id = HMAC(pepper, "user\x00user1")` = `b5b10ddd8ed389f402b82fdd0083f5b3a59e341ca015258318fa31aa6d98272f`
+   - `file1_id = HMAC(pepper, "file\x00user1\x00file1")` = `e2b6560a84d3b489e758198b7fb1f4c3bc1979dfea55ad2984b3b6ef943bbf59`
+3. Find the F line for user1/file1 in enc.db and replace `<nonce> <data> <tag>` with `- - -`.
+4. Now when the victim runs `stor -u user1 -k <secret> -f file1 read`:
+   - Authentication passes (U record is unchanged)
+   - `find_file` finds the entry (user_id and file_id are unchanged)
+   - `has_crypto` is 0 → the program returns `\n` (empty) instead of the original content
+   - **The integrity tag is never checked**
+ 
+### Why This Is a Security Flaw
+The database's cryptographic integrity protection only covers the ciphertext **when has_crypto=1**. There is no MAC or signature over the metadata fields (nonce, data, tag) or the has_crypto sentinel value itself. An attacker who can write to enc.db (the standard break-it scenario) can silently zero out a file's content without knowing the user's key.
+ 
+### The Test
+The test runs a python3 command to patch enc.db in-place, replacing the user1/file1 F-line with `F <uid> <fid> - - -`. The grader then re-reads user1/file1 with the real key and observes the output changed from the original content to an empty string, confirming the integrity break.
