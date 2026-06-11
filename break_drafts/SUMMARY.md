@@ -47,6 +47,24 @@ Confirmed results:
 
 ---
 
+## Scoreboard intel (from /contest/bibifi2026/scoreboard/scores.json, break phase early)
+
+Defense — already broken (points lost): jojo −175, UW_Tacoma −150, GT −100; ALL
+others 0. Offense leaders: TPT_Enterprise 175, 0xwizards 150, GreatTeam26 100.
+
+Implications:
+- Hardened four (0xwizards, GreatTeam26, sensodyne, kevwjin) have 0 breaks against
+  them — corroborates "no viable break found." Skip.
+- GT / jojo / UW_Tacoma already bleeding — our breaks there are real but likely to
+  SPLIT points with other finders. Lower marginal value.
+- **HIGH VALUE & UNIQUE: SMK-112, TPT_Enterprise-107, Husker_Bots-115 have ZERO
+  breaks against them, yet we hold confirmed 100-pt integrity breaks on all three.**
+  Full points, no split. TPT is also the top attacker — breaking it hurts the leader.
+- Teams 108/110/111/113/116 are not in our break package; can't be attacked.
+
+Submit order: (1) SMK integrity, (2) TPT integrity, (3) Husker integrity,
+(4) via repeated-command, (5) SMK/TPT/Husker correctness fallbacks, (6) GT/jojo/UW.
+
 ## TL;DR — what to submit, in priority order
 
 | Pri | Target | id | Type | Draft folder | Confidence |

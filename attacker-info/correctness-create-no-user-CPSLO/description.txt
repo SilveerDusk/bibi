@@ -1,0 +1,8 @@
+Bug: create succeeds for a user that has never been registered.
+
+Spec: create requires the user to already exist. Calling create for an
+unregistered username must print "invalid" and exit 255.
+
+Trigger: create a file for a user that was never registered.
+Expected: exit 255, stdout = "invalid
+".
