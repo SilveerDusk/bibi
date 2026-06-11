@@ -1,0 +1,16 @@
+{
+  "target_team": 115,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "alice", "-k", "secretkey", "register"]},
+    {"program": "stor", "args": ["-u", "alice", "-f", "note", "create"]},
+    {"program": "stor", "args": ["-u", "alice", "-k", "secretkey", "-f", "note", "write"], "stdin": "HELLO_FROM_STDIN"},
+    {"program": "stor", "args": ["-u", "alice", "-k", "secretkey", "-f", "note", "read"]}
+  ],
+  "expected": [
+    {"output": "", "returncode": 0},
+    {"output": "", "returncode": 0},
+    {"output": "", "returncode": 0},
+    {"output": "HELLO_FROM_STDIN", "returncode": 0}
+  ]
+}

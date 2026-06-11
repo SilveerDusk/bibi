@@ -1,0 +1,32 @@
+INTEGRITY: Re-register account takeover destroys/overwrites another user's data without their key
+
+Root cause: stor.c:181-214 (REGISTER action).
+The register handler does NOT reject an already-existing username. At line 182 it only
+searches for a free slot WHEN user_idx == -1; if the user already exists, user_idx keeps
+pointing at the existing record. Execution falls through to line 199-204 where:
+
+    user_record_t *u_rec = &db->users[user_idx];
+    memset(u_rec, 0, sizeof(user_record_t));      // WIPES existing files
+    strncpy(u_rec->username, user, MAX_USER_LEN-1);
+    memcpy(u_rec->salt, salt, SALT_LEN);
+    memcpy(u_rec->key_hash_tag, auth_tag, 32);     // installs ATTACKER's key
+    u_rec->is_active = 1;
+    ... fwrite(db, ...)                            // persisted to enc.db
+
+There is no key check on register against an existing account. An attacker who knows only
+the victim's USERNAME (user1, which is plaintext on disk and trivially known) can re-register
+that account under a key the attacker chooses. This zeroes the entire user_record_t including
+all of user1's file_record_t entries (file1, its IV, tag, ciphertext, ciphertext_len), and
+replaces user1's salt and key_hash_tag with values derived from the attacker's password.
+
+Trigger:
+    stor -u user1 -k attacker_pw register
+
+Effect on the integrity oracle: after this command the grader re-reads user1/file1 with the
+REAL key. Because user1's salt and key_hash_tag are now derived from attacker_pw, the real
+key fails CRYPTO_memcmp at stor.c:258 and read returns "invalid" (and file1's record is gone
+anyway). The result differs from the original file1 content => integrity broken. We modified
+(in fact destroyed) another user's data without possessing their key.
+
+Confidence: HIGH (confirmed by static analysis; the missing existing-user guard in register
+is unambiguous and the write to enc.db is unconditional).

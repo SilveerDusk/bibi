@@ -1,0 +1,14 @@
+Correctness break: stdin input source is not implemented.
+
+The spec states that `write` accepts content from one of three sources: an input file
+(-i <inputfile>), an inline <text> argument, or STDIN. The target never reads stdin:
+there is no read()/fgets/getchar/stdin usage anywhere in stor.c. do_write (stor.c:425-478)
+only handles `infile` and the inline `content` argv token; when neither is supplied it
+falls back to src = "" (stor.c:470) and stores EMPTY content.
+
+Test: register alice, create file `note`, then `write` with no -i and no inline text but
+with content "hello-from-stdin" on stdin, then read it back.
+
+Expected (spec-correct oracle): the read returns "hello-from-stdin".
+Target behavior: the write ignores stdin and stores empty content, so the read returns
+an empty string — a deviation from the expected oracle output.

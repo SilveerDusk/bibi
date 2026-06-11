@@ -1,0 +1,16 @@
+Correctness break: `write` ignores stdin input.
+
+The spec states write content may be provided "via -i file / inline / stdin".
+get_input_content() (stor.c:683-696) only handles the -i infile path and the inline
+content argument; there is no stdin-reading code anywhere in the program.
+
+When `write` is given neither -i nor an inline text argument, `content` is NULL and the
+program writes an EMPTY file (rc 0). A correct oracle reads the content "HELLO" from stdin
+and stores it.
+
+The deviation surfaces on the subsequent `read`: the correct oracle outputs "HELLO",
+while this implementation outputs the empty string. `expected` encodes the correct-oracle
+behavior.
+
+Note: confidence is MEDIUM — it depends on the reference oracle honoring the spec's stdin
+clause. If the oracle also ignores stdin, drop this draft.

@@ -1,0 +1,16 @@
+{
+  "target_team": 106,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "atk", "-k", "pw", "register"]},
+    {"program": "stor", "args": ["-u", "atk", "-f", "f1", "create"]},
+    {"program": "stor", "args": ["-u", "atk", "-k", "pw", "-f", "f1", "write"], "stdin": "hello-from-stdin"},
+    {"program": "stor", "args": ["-u", "atk", "-k", "pw", "-f", "f1", "read"]}
+  ],
+  "expected": [
+    {"output": "", "exit": 0},
+    {"output": "", "exit": 0},
+    {"output": "", "exit": 0},
+    {"output": "hello-from-stdin", "exit": 0}
+  ]
+}

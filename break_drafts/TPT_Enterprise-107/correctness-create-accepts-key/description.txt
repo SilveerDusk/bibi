@@ -1,0 +1,9 @@
+Correctness break (LOW confidence): `create` accepts a stray -k.
+
+The create action (stor.c:749-755) rejects infile/outfile/content but not -k. The spec
+describes create as taking "no key". A strict reference oracle may reject a -k argument
+on create with `invalid`/255; this implementation accepts it and returns 0.
+
+`expected` assumes the oracle rejects the stray -k. Confidence is LOW because the spec does
+not explicitly mandate rejecting extra options on create; if the oracle also accepts it,
+drop this draft.

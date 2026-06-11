@@ -1,0 +1,20 @@
+Correctness: `write` with no input source silently succeeds (stores empty content).
+
+In the `write` branch (stor.c:756-779), if neither `-i <infile>` nor an inline content
+argument is given (and stdin is not consumed — see the stdin finding), `plain` stays NULL
+and `plain_len` stays 0. `encrypt_file` is then called with (NULL, 0), which succeeds and
+stores an empty file; the command exits 0.
+
+Steps:
+1. register fresh attacker user `atk2`.
+2. create file `f1`.
+3. write with NO input source at all (no -i, no inline content, nothing relevant on stdin).
+   This build: success, exit 0, empty file.
+4. read `f1` -> empty, exit 0 in this build.
+
+The `expected` block encodes the hypothesis that a correct reference rejects a write with no
+input source (prints "invalid", exit 255). If instead the oracle reads stdin and treats an
+empty write as valid-empty, this probe is subsumed by the stdin finding. Submit only one of
+the two correctness probes if duplicates are discouraged; the stdin probe is the stronger one.
+
+Confidence: LOW/MEDIUM — depends on the reference oracle's handling of a missing input source.

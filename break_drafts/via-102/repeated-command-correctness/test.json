@@ -1,0 +1,10 @@
+{
+  "target_team": 102,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "atk2", "-k", "atkkey", "register", "register"]}
+  ],
+  "expected": [
+    {"stdout": "", "exit": 0}
+  ]
+}

@@ -1,0 +1,24 @@
+CORRECTNESS: write does not support stdin input (spec violation)
+
+Root cause: stor.c do_write() (lines 1146-1192) only reads plaintext from
+either -i <inputfile> (line 1158) or inline positional text (line 1160-1165).
+There is NO stdin code path. parse_args() (lines 516-522) additionally REJECTS
+a write invocation that has neither -i nor inline text:
+    if (!args->inputfile && !args->text) return 0;   // stor.c:520
+=> exits "invalid" / 255.
+
+The program spec states write input may be supplied "via -i file / inline /
+stdin". A correct reference oracle therefore accepts content piped on stdin,
+stores it, and a subsequent read returns it. via-102 instead returns "invalid"
+(255) for the write and the file stays empty.
+
+Trigger (uses a fresh attacker account, no secret key needed):
+  register atk / create sf / write sf with stdin "HELLOSTDIN" / read sf
+
+Expected (oracle) final read output: "HELLOSTDIN\n".
+via-102 actual: write step prints "invalid" (255); read of the
+never-written file prints just "\n". Outputs diverge => correctness.
+
+Confidence: MEDIUM. Confirmed that via-102 has no stdin handling. The win
+depends on the reference oracle implementing the stdin feature named in the
+spec. If the oracle also omits stdin, this test will not score.

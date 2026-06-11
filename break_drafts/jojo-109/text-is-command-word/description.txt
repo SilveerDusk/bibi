@@ -1,0 +1,29 @@
+Correctness break: inline write text that equals a command verb is misparsed.
+
+Root cause: args.c:84-95 (args_parse). For every bare (non-flag) token the
+parser first calls cmd_from_word(). If the token is one of "register",
+"create", "write", or "read" it is ALWAYS treated as a command word, never as
+the inline write payload. The branch that records inline text (req->text /
+have_text) is only reached when cmd_from_word() returns CMD_NONE.
+
+Consequently, when the command is "write" and the inline <text> argument is the
+literal string "read" (or "register"/"create"), cmd_from_word("read")==CMD_READ
+which differs from the already-selected CMD_WRITE, so args.c:87-88 returns 0 and
+the program prints "invalid" and exits 255.
+
+Per the spec, `stor -u <user> -k <key> -f <file> write <text>` must store <text>
+verbatim. The correct oracle stores the 4-byte content "read" and the write
+succeeds; reading it back yields "read".
+
+Trigger (fresh DB):
+  stor -u a -k s register
+  stor -u a -f f create
+  stor -u a -k s -f f write read     <-- jojo prints "invalid"/255; oracle writes "read"
+  stor -u a -k s -f f read           <-- jojo never reaches valid state; oracle prints "read"
+
+The divergence is on the 3rd and 4th commands: jojo exits 255 with "invalid"
+while the correct implementation exits 0 and ultimately outputs "read".
+
+Confidence: HIGH. Pure parsing logic, machine-checkable, no crypto or platform
+dependence. Same defect applies to any inline text equal to a reserved verb
+("register", "create", "write", "read").

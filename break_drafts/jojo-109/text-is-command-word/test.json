@@ -1,0 +1,16 @@
+{
+  "target_team": 109,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "a", "-k", "s", "register"]},
+    {"program": "stor", "args": ["-u", "a", "-f", "f", "create"]},
+    {"program": "stor", "args": ["-u", "a", "-k", "s", "-f", "f", "write", "read"]},
+    {"program": "stor", "args": ["-u", "a", "-k", "s", "-f", "f", "read"]}
+  ],
+  "expected": [
+    {"stdout": "", "exit": 0},
+    {"stdout": "", "exit": 0},
+    {"stdout": "", "exit": 0},
+    {"stdout": "read", "exit": 0}
+  ]
+}

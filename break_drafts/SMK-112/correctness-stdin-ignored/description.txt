@@ -1,0 +1,24 @@
+CORRECTNESS: write command ignores stdin entirely
+
+Root cause: stor.c:279-295 (WRITE action input selection).
+The implementation only sources write payload from two places:
+  1. -i <infile>  (read_input_file, line 283-285)
+  2. inline arg argv[optind+1]  (content_inline, line 149 + 286-290)
+If neither is present, line 291-295 sets plaintext_len = 0 and writes an EMPTY payload.
+There is no read of stdin anywhere in the program (no fread(stdin)/read(0)/getline on stdin).
+
+The program spec states write input may be supplied via "-i file / inline / stdin", and the
+provided sample crash test.json feeds the write content over stdin ("stdin":"AAAA..."), which
+implies the reference oracle reads stdin. This implementation discards stdin and stores 0 bytes.
+
+Trigger (machine-checkable):
+  register atk; create file f; write to f with content delivered ONLY on stdin; read f back.
+  - Reference oracle: read returns the stdin content ("HELLOSTDIN").
+  - This implementation: stored payload is empty, so read returns "" (no bytes written).
+  The final read output differs from the oracle => correctness break.
+
+Notes / confidence: HIGH that the binary ignores stdin (the source has no stdin path at all).
+The "expected" array encodes the oracle behavior: register/create/write emit no stdout, and the
+final read emits the stdin text. If the grader's oracle appends a trailing newline on read, the
+expected read value may need a trailing "\n"; the load-bearing divergence (empty vs "HELLOSTDIN")
+holds regardless.

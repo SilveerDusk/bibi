@@ -1,0 +1,25 @@
+Correctness: `write` ignores stdin entirely.
+
+Spec: "stor -u <user> -k <key> -f <file> write <text>" takes content "via -i
+file, inline text, or stdin". A correct implementation, when given neither -i
+nor an inline text argument, must read the content from stdin.
+
+Root cause: do_write() in stor.c (lines 560-571) only handles -i (infile) and an
+inline text argument. The final `else` branch hardcodes empty content
+(content = ""; clen = 0) and NEVER reads stdin. There is no read(0,...) /
+fread(stdin) / getline anywhere in the program (only fread in read_file_all,
+used for -i files and the db). See grep: the sole fread is at stor.c:275.
+
+Trigger: register atk, create file f, then `write` with content supplied ONLY on
+stdin ("HELLO") and no -i / no inline text. The target seals empty content, so a
+subsequent `read` prints nothing. A correct oracle stores "HELLO", so `read`
+prints "HELLO".
+
+Observed (target):   read -> "" (empty)
+Expected (oracle):   read -> "HELLO"
+
+The output of the final read command differs from the oracle on valid input =>
+correctness break.
+
+Confidence: HIGH. Confirmed by static analysis — the binary has no stdin-reading
+code path at all.

@@ -1,0 +1,17 @@
+Integrity break: unauthenticated user re-registration (account takeover).
+
+Root cause: add_or_update_user() (stor.c:249-269), invoked by the `register` action
+(stor.c:741-747), overwrites an EXISTING user's salt and key-verifier without ever
+verifying knowledge of that user's current key. There is no ownership check.
+
+Exploit:
+1. `register user1` with an attacker-chosen key ("attackerkey"). This silently replaces
+   user1's salt + verifier so the account is now controlled by the attacker key.
+2. `write user1/file1 "PWNED_BY_ATTACKER"` using the attacker key. verify_user_key now
+   passes, find_file locates the existing user1/file1, and encrypt_file overwrites the
+   stored ciphertext.
+
+Result: user1/file1's stored content is modified without ever knowing user1's real key.
+When the grader re-reads file1 with the original key, the original verifier no longer
+matches (and the underlying ciphertext has been replaced), so the result differs from the
+original INTEGRITY_FLAG. The data has been modified without authorization.

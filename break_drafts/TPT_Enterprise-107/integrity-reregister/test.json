@@ -1,0 +1,8 @@
+{
+  "target_team": 107,
+  "type": "integrity",
+  "commands": [
+    {"program": "stor", "args": ["-u", "user1", "-k", "attackerkey", "register"]},
+    {"program": "stor", "args": ["-u", "user1", "-k", "attackerkey", "-f", "file1", "write", "PWNED_BY_ATTACKER"]}
+  ]
+}

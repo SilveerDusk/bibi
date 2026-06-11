@@ -1,0 +1,12 @@
+{
+  "target_team": 107,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "a", "-k", "s", "register"]},
+    {"program": "stor", "args": ["-u", "a", "-k", "ignored", "-f", "f", "create"]}
+  ],
+  "expected": [
+    {"output": "", "returncode": 0},
+    {"output": "invalid", "returncode": 255}
+  ]
+}

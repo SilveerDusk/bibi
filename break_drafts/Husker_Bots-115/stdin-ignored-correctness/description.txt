@@ -1,0 +1,15 @@
+Correctness break: the `write` action ignores stdin.
+
+The program spec states that write content may be supplied via stdin
+(the sample test.json itself pipes write input on "stdin"). In stor.c
+the write handler (lines 539-563) only reads content from a `-i <file>`
+argument or an inline positional content argument. There is no read of
+standard input anywhere in the program. When neither `-i` nor an inline
+content argument is present, the code takes the `else` branch (lines
+559-563) and performs an EMPTY write (ptlen = 0).
+
+This test registers a user, creates a file, then writes content over
+stdin only (no -i, no inline arg), then reads it back. A correct
+implementation stores the stdin bytes, so the final `read` should print
+"HELLO_FROM_STDIN". This target instead stored nothing, so its `read`
+prints empty output, deviating from the reference oracle.

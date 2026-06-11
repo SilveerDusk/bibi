@@ -1,0 +1,16 @@
+{
+  "target_team": 106,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "atk2", "-k", "pw", "register"]},
+    {"program": "stor", "args": ["-u", "atk2", "-f", "f1", "create"]},
+    {"program": "stor", "args": ["-u", "atk2", "-k", "pw", "-f", "f1", "write"]},
+    {"program": "stor", "args": ["-u", "atk2", "-k", "pw", "-f", "f1", "read"]}
+  ],
+  "expected": [
+    {"output": "", "exit": 0},
+    {"output": "", "exit": 0},
+    {"output": "invalid", "exit": 255},
+    {"output": "invalid", "exit": 255}
+  ]
+}

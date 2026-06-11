@@ -1,0 +1,45 @@
+CORRECTNESS BREAK — write ignores stdin content source
+
+Root cause
+----------
+The spec for the `write` action states:
+  "Input can come from `-i <inputfile>` or inline <text> or stdin."
+
+The target's do_write (stor.c:711-723) resolves the content source as ONLY two
+real sources plus an empty fallback:
+
+    if (infile) {                      // -i path
+        read_entire_file(...);
+    } else if (text) {                 // inline argv text
+        content = text;
+    } else {                           // <-- NO stdin read here
+        content = (unsigned char *)"";
+        content_len = 0;
+    }
+
+There is no read of standard input anywhere in the program (confirmed: the only
+fread() call is in read_entire_file() for the -i file path, stor.c:147; no
+getchar/fgets/read(0,...) exists). When a user runs `write` with neither -i nor
+an inline text argument and pipes content on stdin, the reference oracle stores
+the stdin bytes, but the target silently stores EMPTY content.
+
+Trigger
+-------
+Using a freshly-registered attacker account (allowed by the rules; does not need
+the victim key):
+  1. register attacker
+  2. create file "note"
+  3. write "note" with content supplied on STDIN ("HELLO_FROM_STDIN"), no -i, no
+     inline text argument
+  4. read "note"
+
+Expected (oracle): the read prints "HELLO_FROM_STDIN", exit 0.
+Target actual:     the write stored empty content, so the read prints "" (empty),
+exit 0.
+
+The stdout of the final `read` command differs from the oracle ("HELLO_FROM_STDIN"
+vs ""), which the correctness grader flags. The first three commands also succeed
+(exit 0, empty stdout) so the sequence reaches the divergent read.
+
+Confidence: HIGH. Purely static and unambiguous — the binary contains no stdin
+reader, so any stdin-sourced write is dropped.

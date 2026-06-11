@@ -1,0 +1,21 @@
+Correctness: `write` ignores stdin.
+
+The spec states write input may be provided via "-i file / inline / stdin". This
+implementation (stor.c:756-779, main `write` branch) reads input ONLY from `-i <infile>`
+(stor.c:765) or the inline trailing content argument (stor.c:767). There is no code path
+that reads stdin.
+
+Steps in this test:
+1. register a fresh attacker user `atk` (does not touch user1/user2 state).
+2. create file `f1`.
+3. write to `f1` with the payload "hello-from-stdin" supplied ON STDIN (no -i, no inline arg).
+   This build ignores stdin: plain=NULL, plain_len=0, encrypt_file stores an EMPTY file and
+   exits 0.
+4. read `f1`.
+
+Expected (reference oracle, which honors stdin per the spec): step 4 prints "hello-from-stdin".
+This build: step 4 prints nothing (empty content). The outputs of the read command differ,
+so the grader's oracle comparison flags a correctness divergence.
+
+Confidence: MEDIUM — relies on the reference oracle honoring stdin, which the spec wording and
+the sample crash test.json (which feeds write via "stdin") both imply.

@@ -1,0 +1,22 @@
+CORRECTNESS: repeated command word rejected despite "last wins" rule
+
+Root cause: parse_args() increments cmd_count for every command token seen
+(stor.c:493-495) and then enforces:
+    if (args->cmd_count != 1) return 0;     // stor.c:502
+=> a command word repeated twice ("register register") yields cmd_count==2
+   and the program returns "invalid" / 255.
+
+The spec states "Repeated arg: last wins". Under a last-wins reading a repeated
+command should be accepted (use the last occurrence) and the register should
+succeed (exit 0, no output).
+
+Trigger:
+  stor -u atk2 -k atkkey register register
+
+Expected (oracle, last-wins): exit 0, empty stdout (successful register).
+via-102 actual: "invalid", exit 255.
+
+Confidence: LOW-MEDIUM. The divergence is real and machine-checkable, but it
+hinges on whether the reference oracle applies "last wins" to the command
+token (vs only to -u/-k/-f/-i/-o flags). If the oracle also rejects duplicate
+commands this will not score.
