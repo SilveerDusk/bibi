@@ -1,0 +1,13 @@
+register-no-key — attacker-info turnaround targeting team 112 (SMK)
+
+Origin: attacker-info/1116-register_no_key (submission 1116, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: register_no_key
+Type: correctness
+Target team: 108
+
+What it checks: register requires -k; omitting it is invalid.
+How it triggers: register alice with no -k.
+Expected: invalid/255.
+Counts as a break if: registration succeeds without key.

@@ -1,0 +1,13 @@
+create-no-user — attacker-info turnaround targeting team 106 (kevwjin)
+
+Origin: attacker-info/1113-create_no_user (submission 1113, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: create_no_user
+Type: correctness
+Target team: 108
+
+What it checks: file must be owned by registered user.
+How it triggers: create file "f" for "ghost" who never registered.
+Expected: "invalid", exits 255.
+Counts as a break if: file created for nonexistent user.

@@ -1,0 +1,29 @@
+empty-filename — attacker-info turnaround targeting team 114 (uw)
+
+Origin: attacker-info/885-team108_empty_filename (submission 885, original result: —).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Empty filename accepted on create
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Register alice, then create with -f "" (empty filename).
+
+Observed behavior:
+  create succeeds with exit 0.
+
+Expected behavior:
+  An empty filename is invalid input. stor should print invalid and exit 255.
+
+Why this violates the spec or security goal:
+  Accepting an empty filename differs from the reference oracle and creates
+  ambiguous file records.
+
+Suspected file and line:
+  stor108.c create handler: only checks strlen(file) >= MAX_NAME, not empty string.
+
+Minimal reproducer:
+  stor -u alice -k secret123 register
+  stor -u alice -f "" create

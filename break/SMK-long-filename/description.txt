@@ -1,0 +1,18 @@
+long-filename — attacker-info turnaround targeting team 112 (SMK)
+
+Origin: attacker-info/978-correctness-long-filename-CPSLO (submission 978, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: create rejects a 256-character filename that the spec permits.
+
+stor.c defines MAX_NAME=256 and checks strlen(file) >= MAX_NAME.
+A 256-char filename has strlen=256 >= 256 and is rejected with "invalid"
+exit 255.
+
+The reference (stor-old.c) defines MAX_STR_LEN=4096 and checks
+strlen(file) > MAX_STR_LEN — a 256-char filename has strlen=256 <= 4096
+so it is accepted (exit 0).
+
+Trigger: register alice, then ./stor -u alice -f "f"*256 create
+Expected (spec): exit 0
+Observed: stdout="invalid", exit 255

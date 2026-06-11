@@ -1,0 +1,33 @@
+fifo-hang — attacker-info turnaround targeting team 105 (wizards)
+
+Origin: attacker-info/891-team108_input_file_fifo_timeout (submission 891, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: write hangs when -i names a FIFO
+Bug type: crash
+Severity: 50 points
+
+Command used:
+  Register alice, create file f, create a named pipe at /tmp/stor_fifo, then
+  write with -i /tmp/stor_fifo.
+
+Observed behavior:
+  The write command blocks indefinitely waiting to read from the FIFO. The process
+  does not return within 60 seconds.
+
+Expected behavior:
+  FIFOs and other non-regular files must be rejected immediately with invalid/255,
+  or read with a bounded timeout. The command must not hang past the 60s limit.
+
+Why this violates the spec or security goal:
+  A hang past 60 seconds counts as a crash/DoS break. Hostile -i paths must not
+  block the grader.
+
+Suspected file and line:
+  stor108.c write handler: fread on a FIFO blocks with no timeout or file-type
+  check.
+
+Minimal reproducer:
+  mkfifo /tmp/stor_fifo
+  stor -u alice -k k -f f -i /tmp/stor_fifo write

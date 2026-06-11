@@ -1,0 +1,18 @@
+long-username — attacker-info turnaround targeting team 104 (sensodyne)
+
+Origin: attacker-info/980-correctness-long-username-CPSLO (submission 980, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: register rejects a 256-character username that the spec permits.
+
+stor.c defines MAX_NAME=256 and checks strlen(user) >= MAX_NAME.
+A 256-char username has strlen=256 which is >= 256, so it returns "invalid"
+exit 255.
+
+The reference (stor-old.c) defines MAX_STR_LEN=4096 and checks
+strlen(user) > MAX_STR_LEN — a 256-char username has strlen=256 <= 4096
+so it is accepted (exit 0).
+
+Trigger: ./stor -u "a"*256 -k secret register
+Expected (spec): exit 0 (username within allowed length)
+Observed: stdout="invalid", exit 255

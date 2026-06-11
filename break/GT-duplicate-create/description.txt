@@ -1,0 +1,13 @@
+duplicate-create — attacker-info turnaround targeting team 101 (GT)
+
+Origin: attacker-info/596-correctness-cpslo-dup-create (submission 596, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: creating a file that already exists exits 0 instead of 255.
+
+Spec: duplicate file must print 'invalid' and exit 255.
+Root cause: stor.c:280 — `if (file_idx >= 0) { SUCCESS_OUT(); }`
+
+Trigger: register, create file 'f', create file 'f' a second time.
+Expected (oracle): third command exits 255.
+Actual (bug): exits 0.

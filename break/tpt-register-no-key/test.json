@@ -1,0 +1,14 @@
+{
+  "target_team": 107,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "register"
+      ]
+    }
+  ]
+}

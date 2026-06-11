@@ -1,0 +1,30 @@
+corrupt-db — attacker-info turnaround targeting team 106 (kevwjin)
+
+Origin: attacker-info/888-team108_huge_blob_length (submission 888, original result: Break valid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Corrupt enc.db metadata does not invalidate subsequent reads
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Register, create, write x, corrupt four bytes at offset 12 in enc.db, then read
+  with the correct key.
+
+Observed behavior:
+  read returns x with exit 0.
+
+Expected behavior:
+  Tampered enc.db bytes must be detected. read should print invalid and exit 255.
+
+Why this violates the spec or security goal:
+  Forgery detection requires rejecting databases modified outside stor. The target
+  silently accepts corrupted on-disk state.
+
+Suspected file and line:
+  stor108.c db_load: no structural validation or integrity checks on loaded records.
+
+Minimal reproducer:
+  python3 -c "d=bytearray(open('enc.db','rb').read());d[12:16]=b'\\xff\\xff\\xff\\xff';open('enc.db','wb').write(d)"
+  stor -u alice -k k -f f read

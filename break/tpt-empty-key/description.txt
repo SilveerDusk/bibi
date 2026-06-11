@@ -1,0 +1,13 @@
+empty-key — attacker-info turnaround targeting team 107 (tpt)
+
+Origin: attacker-info/598-correctness-cpslo-empty-key (submission 598, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: an empty string key is accepted instead of being rejected with exit 255.
+
+Spec: -k requires a non-empty secret key.  The bounds check only rejects keys
+>= MAX_NAME, letting length-0 keys through.
+
+Trigger: register with -k '' (empty key).
+Expected (oracle): exit 255, stdout 'invalid'.
+Actual (bug): exit 0.
