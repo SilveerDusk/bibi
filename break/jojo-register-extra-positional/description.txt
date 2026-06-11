@@ -1,0 +1,17 @@
+CORRECTNESS BREAK — register rejects an extra positional argument the reference accepts
+
+Root cause
+----------
+jojo's parser stores any non-verb bare word as inline text; `validate()`
+forbids inline text on `register`:
+
+    jojo-109/.../build/args.c:91-93   bare word -> req->text, req->have_text = 1
+    jojo-109/.../build/args.c:32-34   CMD_REGISTER: if (... || r->have_text) return 0;  // -> invalid
+
+Reference (lenient): `register alice extra` ignores the trailing word, exit 0.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice EXTRA   -> oracle exit 0 "" ; jojo exit 255 "invalid\n"
+Divergence in BOTH exit code and stdout. `expected[]` = oracle behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).

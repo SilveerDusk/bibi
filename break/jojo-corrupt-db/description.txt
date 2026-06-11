@@ -1,0 +1,27 @@
+CORRECTNESS BREAK — read of a tampered enc.db errors instead of returning the content
+
+Source: this is the same corrupt-db probe 0xwizards used against us (#883).
+jojo is weak to it.
+
+Root cause
+----------
+After a normal write, bytes 12-31 of enc.db are overwritten with 0xFF. jojo's
+authenticated read re-loads the DB and the per-record secretbox MAC / header
+check fails, so read returns the "invalid" error contract (puts("invalid"),
+exit 255; jojo-109/.../build/stor.c:28-29). The reference, on the SAME
+corruption, still returns the stored plaintext "seed" (exit 0) — it does not
+treat those header bytes as integrity-critical.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice -k k         -> both exit 0
+  2. create f                    -> both exit 0
+  3. write f "seed"              -> both exit 0
+  4. corrupt enc.db bytes 12-31  (sh + python3)
+  5. read f -k k   -> oracle exit 0 "seed" ; jojo exit 255 "invalid\n"
+`expected[]` encodes the oracle (returns "seed"). Uses the same `sh -c python3`
+db-mutation mechanism 0xwizards submitted against team 108, so the harness
+format is supported.
+
+Confidence: HIGH for these binaries (differential-tested). Note: the specific
+byte range (12-31) is what 0xwizards used; the divergence was confirmed
+dynamically against jojo's actual binary.

@@ -1,0 +1,22 @@
+CORRECTNESS BREAK — create rejects an empty filename the reference accepts
+
+Source: 0xwizards submitted this against us (#885 team108_empty_filename).
+Their own binary is weak to it (the reference, and our build, ACCEPT an empty
+filename — so this break was rejected against us but lands on 0xwizards).
+
+Root cause
+----------
+    0xwizards-105/.../build/stor.c:874-875
+        flen = strlen(file);
+        if (flen == 0 || flen > MAX_NAME) die_invalid();   // empty -f -> invalid/255
+
+Reference (lenient): only rejects names >= MAX_NAME; an empty filename is
+accepted, exit 0.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice        -> both exit 0, ""
+  2. create -f "" (empty)  -> oracle exit 0 "" ; wizards exit 255 "invalid\n"
+Divergence on the 2nd command in BOTH exit code and stdout. `expected[]` =
+oracle behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).

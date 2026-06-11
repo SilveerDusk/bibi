@@ -1,0 +1,19 @@
+CORRECTNESS BREAK — register rejects an empty username the reference accepts
+
+Source: 0xwizards submitted this against us (#886 team108_empty_username).
+Their own binary is weak to it.
+
+Root cause
+----------
+    0xwizards-105/.../build/stor.c:867-868
+        ulen = strlen(user);
+        if (ulen == 0 || ulen > MAX_NAME) die_invalid();   // empty -u -> invalid/255
+
+Reference (lenient): only rejects usernames >= MAX_NAME; an empty username is
+accepted, exit 0.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register -u "" -k secret123   -> oracle exit 0 "" ; wizards exit 255 "invalid\n"
+Divergence in BOTH exit code and stdout. `expected[]` = oracle behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).

@@ -1,0 +1,24 @@
+CORRECTNESS BREAK — create rejects an extra positional argument the reference accepts
+
+Source: jojo turned this class of probe (extra-positional) on us; jojo's own
+binary is weak to it.
+
+Root cause
+----------
+The reference parser accepts a stray trailing positional and ignores it,
+returning success (exit 0, no output). jojo's parser treats any bare word that
+is not a command verb as "inline text" and then `validate()` forbids inline
+text on `create`:
+
+    jojo-109/.../build/args.c:91-93   bare word -> req->text, req->have_text = 1
+    jojo-109/.../build/args.c:36-38   CMD_CREATE: if (... || r->have_text) return 0;  // -> invalid
+
+Reference (lenient): treats `create notes extra` as a normal create, exit 0.
+
+Trigger / divergence (dynamically confirmed in bibifi-sandbox vs the reference oracle)
+  1. register alice                              -> both exit 0, ""
+  2. create notes  EXTRA                         -> oracle exit 0 "" ; jojo exit 255 "invalid\n"
+Divergence on the 2nd command in BOTH exit code and stdout. The `expected[]`
+array encodes the oracle (lenient) behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).

@@ -1,0 +1,23 @@
+CORRECTNESS BREAK — create rejects an extra positional argument the reference accepts
+
+Source: 0xwizards submitted this exact probe against us (#884
+team108_create_extra_positional). Their own binary is weak to it.
+
+Root cause
+----------
+0xwizards allows `action + one text arg` at the CLI (stor.c:864), but the
+create handler then rejects any text:
+
+    0xwizards-105/.../build/stor.c:883-884
+        } else if (strcmp(action, "create") == 0) {
+            if (text) { db_free(&db); die_invalid(); }   // "extra" -> invalid/255
+
+Reference (lenient): treats the trailing positional as ignored, exit 0.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice          -> both exit 0, ""
+  2. create notes EXTRA      -> oracle exit 0 "" ; wizards exit 255 "invalid\n"
+Divergence on the 2nd command in BOTH exit code and stdout. `expected[]` =
+oracle behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).

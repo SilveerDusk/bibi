@@ -1,0 +1,26 @@
+CORRECTNESS BREAK — read of a tampered enc.db errors instead of returning the content
+
+Source: this is 0xwizards' own probe (#883 team108_corrupt_db_accepted),
+turned back on them.
+
+Root cause
+----------
+After a normal write, bytes 12-31 of enc.db are overwritten with 0xFF. On the
+following read, 0xwizards re-loads the DB and rejects the corruption:
+
+    0xwizards-105/.../build/stor.c:878
+        if (db_load(&db) != 0) die_invalid();   /* corrupt -> invalid/255 */
+
+The reference, on the SAME corruption, still returns the stored plaintext
+"seed" (exit 0).
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice -k k         -> both exit 0
+  2. create f                    -> both exit 0
+  3. write f "seed"              -> both exit 0
+  4. corrupt enc.db bytes 12-31  (sh + python3)
+  5. read f -k k   -> oracle exit 0 "seed" ; wizards exit 255 "invalid\n"
+`expected[]` encodes the oracle (returns "seed"). Uses the same `sh -c python3`
+db-mutation mechanism 0xwizards themselves submitted against team 108.
+
+Confidence: HIGH for these binaries (differential-tested against the oracle).

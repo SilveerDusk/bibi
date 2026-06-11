@@ -1,0 +1,18 @@
+CORRECTNESS BREAK — register rejects an extra positional argument the reference accepts
+
+Source: 0xwizards submitted this class against us (#897
+team108_register_extra_positional). Their own binary is weak to it.
+
+Root cause
+----------
+    0xwizards-105/.../build/stor.c:880-881
+        if (strcmp(action, "register") == 0) {
+            if (text) { db_free(&db); die_invalid(); }   // "extra" -> invalid/255
+
+Reference (lenient): `register alice extra` ignores the trailing word, exit 0.
+
+Trigger / divergence (dynamically confirmed vs reference oracle)
+  1. register alice EXTRA   -> oracle exit 0 "" ; wizards exit 255 "invalid\n"
+Divergence in BOTH exit code and stdout. `expected[]` = oracle behavior.
+
+Confidence: HIGH (differential-tested against the shipped reference oracle).
