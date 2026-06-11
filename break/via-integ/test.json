@@ -1,0 +1,14 @@
+{
+  "target_team": 102,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "sed",
+      "args": [
+        "-i",
+        "s/^F b5b10ddd8ed389f402b82fdd0083f5b3a59e341ca015258318fa31aa6d98272f e2b6560a84d3b489e758198b7fb1f4c3bc1979dfea55ad2984b3b6ef943bbf59 .*/F b5b10ddd8ed389f402b82fdd0083f5b3a59e341ca015258318fa31aa6d98272f e2b6560a84d3b489e758198b7fb1f4c3bc1979dfea55ad2984b3b6ef943bbf59 - - -/",
+        "enc.db"
+      ]
+    }
+  ]
+}
