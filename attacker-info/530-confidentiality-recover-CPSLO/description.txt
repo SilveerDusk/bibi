@@ -1,0 +1,8 @@
+Confidentiality attack against user2/file2.
+
+Goal: recover user2/file2's content without the key and declare it
+in the 'output' field so the grader's comparison passes.
+
+TODO: check if target stores enc.db in plaintext or with a weak /
+reused nonce, or leaks content via a side-channel (stdout, timing).
+Add 'output': '<recovered secret>' to the last command once known.

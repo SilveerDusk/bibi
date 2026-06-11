@@ -1,0 +1,12 @@
+Bug: register succeeds with an empty key instead of rejecting it.
+
+Spec: a key must be a non-empty string. Calling register with -k ""
+must print "invalid" to stdout and exit 255.
+
+Root cause: stor.c only checks strlen(key) >= MAX_NAME (256) for register,
+which allows length 0 through. The reference implementation (stor-old.c)
+explicitly rejects empty keys with: if (strlen(key) == 0) return invalid();
+
+Trigger: ./stor -u alice -k "" register
+Expected: stdout = "invalid", exit 255
+Observed: stdout = "", exit 0 (user registered with empty key)

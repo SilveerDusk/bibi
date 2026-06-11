@@ -1,0 +1,40 @@
+CORRECTNESS (25 pts) — re-create of an existing file errors instead of succeeding
+
+This is the same defect class that already scored against teams 114, 107, and
+104 (see break/uw-create-existing-file-mismatch, tpt-..., sensodyne-...).
+
+ROOT CAUSE
+The reference treats `create` of an already-existing (owner, filename) pair as
+an idempotent no-op that SUCCEEDS (starter-package/build/stor.c:359-362):
+
+    int file_idx = db_find_file(&db, user, file);
+    if (file_idx >= 0) {
+        SUCCESS_OUT();              // prints nothing, exit 0
+    }
+
+jojo instead treats it as a hard error (build/cmd.c:18-20):
+
+    int cmd_create(Db *db, const Request *req) {
+        if (!db_find_user(db, req->user)) return -1;
+        if (db_find_file(db, req->user, req->file)) return -1;   // <-- duplicate => error
+        return db_add_file(db, req->user, req->file);
+    }
+
+A non-zero return from cmd_create makes main() print "invalid" / exit 255
+(stor.c:57-60).
+
+EMPIRICALLY CONFIRMED AGAINST THE REFERENCE ORACLE BINARY
+  step 3 (second create of atk/note):
+    oracle (starter-package/build/stor):  exit 0, stdout ""
+    target (jojo):                         exit 255, stdout "invalid"
+
+TRIGGER (fresh DB, attacker-owned account only)
+  1. stor -u atk -k s register     -> exit 0, ""
+  2. stor -u atk -f note create     -> exit 0, "" (file now exists)
+  3. stor -u atk -f note create     -> DIVERGES: oracle exit 0/"", jojo exit 255/"invalid"
+
+The test.json encodes the oracle behavior (idempotent-success). The grader
+flags the mismatch on the third command.
+
+CONFIDENCE: HIGH. The target source unambiguously returns -1 on a duplicate
+create; the divergence is verified by running the shipped reference binary.

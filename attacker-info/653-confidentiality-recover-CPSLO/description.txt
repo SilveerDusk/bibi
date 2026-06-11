@@ -1,0 +1,30 @@
+Confidentiality attack against user2/file2 in CPSLO (team 108).
+
+Both users are keyed with $TEAM_FLAG. We have user2's PBKDF2 material:
+  salt       : 5bb53081a1513daca5d55d3a118c4bb1
+  key_hash   : e325ee6e404489b8f3e5244ed61b6a2f1155926000c5c9e8fb6114d1aba77793
+  iterations : 10000
+  algorithm  : PBKDF2-HMAC-SHA256, 32-byte output
+
+hashcat (mode 12000 = PBKDF2-HMAC-SHA256):
+  hash : sha256:10000:W7UwgaFRPayl1V06EYxLsQ==:4yXubkBEibj35SRO1htp/hFVkmAAxcnouzYU0au6d5M=
+
+  hashcat -m 12000 hash.txt wordlist.txt
+  hashcat -m 12000 hash.txt -a 3 'flag{?h?h?h?h?h?h?h?h}'  # if 8-hex-char inner
+
+file2 ciphertext (48 bytes = 48 char plaintext flag):
+  iv         : fb495a66fdbb94f55c8ca230c572f565
+  tag        : 4469d4eecb240c629ad20582ce51b99f
+  ciphertext : 8bc7baea84db9b373117776ae44a5223315f24e6263bdcfdfd8f9df39a678987f079ebdeddb1f94a42a2cc95d91fa6a6
+
+Once TEAM_FLAG is known, decrypt with:
+  from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+  from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+  from cryptography.hazmat.primitives import hashes
+  salt = bytes.fromhex('5bb53081a1513daca5d55d3a118c4bb1')
+  iv   = bytes.fromhex('fb495a66fdbb94f55c8ca230c572f565')
+  tag  = bytes.fromhex('4469d4eecb240c629ad20582ce51b99f')
+  ct   = bytes.fromhex('8bc7baea84db9b373117776ae44a5223315f24e6263bdcfdfd8f9df39a678987f079ebdeddb1f94a42a2cc95d91fa6a6')
+  key  = PBKDF2HMAC(hashes.SHA256(), 32, salt, 10000).derive(b'TEAM_FLAG')
+  aad  = b'user2file2'  # no separator (AAD design flaw)
+  print(AESGCM(key).decrypt(iv, ct + tag, aad))

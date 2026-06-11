@@ -3,16 +3,31 @@ CORRECTNESS (25 pts) — extra trailing newline on the "invalid" error token
 ROOT CAUSE
 The reference prints the error token as exactly "invalid" with NO trailing
 newline (starter-package/build/stor.c:47-48, printf("invalid")). This target
-emits "invalid\n" (puts("invalid") at stor.c:28), adding a trailing newline.
+emits "invalid\n" (puts("invalid") at stor.c:28 -> fail()), adding a trailing
+newline on EVERY error path.
+
+EMPIRICALLY CONFIRMED AGAINST THE REFERENCE ORACLE BINARY
+Ran the shipped reference (starter-package/build/stor) and the target side by
+side on the missing-username error:
+
+  target (jojo) stdout bytes:  69 6e 76 61 6c 69 64 0a   = "invalid\n" (8 bytes)
+  oracle        stdout bytes:  69 6e 76 61 6c 69 64      = "invalid"   (7 bytes)
+
+This is no longer a guess: the canonical reference distributed to all teams
+prints "invalid" with no newline; jojo prints "invalid\n". Valid read output
+(e.g. "hello") is byte-identical between the two, so the divergence is purely
+the error token's trailing newline.
 
 ORACLE vs TARGET
 Command 'register' with -u omitted is an error for both.
   - Reference oracle stdout: "invalid"   (exit 255)
   - Target stdout:           "invalid\n" (exit 255)
-If the grader compares stdout byte-for-byte (the functionality suite specifies
-expected stdout exactly as "invalid"), the trailing newline makes the outputs
-differ -> valid correctness break.
 
-CONFIDENCE: MEDIUM. Depends on the grader NOT trimming trailing whitespace before
-comparison. No penalty for trying. The trigger is any error path; we use the
-missing-username error so no DB state is touched.
+The test.json encodes the oracle behavior (stdout exactly "invalid"). If the
+grader compares stdout byte-for-byte the trailing newline makes the outputs
+differ -> valid correctness break. This applies to every error case in the
+suite.
+
+CONFIDENCE: MEDIUM-HIGH. The byte difference is verified against the real
+oracle. Residual risk is only that the grader strips trailing whitespace before
+comparing. No DB state is touched (uses the missing-username error path).

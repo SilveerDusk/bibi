@@ -1,0 +1,9 @@
+Bug: an empty string filename is accepted instead of being rejected with
+exit 255.
+
+Spec: -f requires a non-empty filename.  The bounds check only rejects names
+>= MAX_NAME, letting length-0 filenames through.
+
+Trigger: register, then create with -f '' (empty filename).
+Expected (oracle): second command exits 255, stdout 'invalid'.
+Actual (bug): exits 0.

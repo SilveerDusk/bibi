@@ -1,0 +1,19 @@
+Integrity attack against user1/file1 in CPSLO (team 108).
+
+CPSLO uses AES-256-GCM (OpenSSL EVP) with:
+  - Key = PBKDF2-HMAC-SHA256(TEAM_FLAG, user_salt, 10000 iters, 32 bytes)
+  - AAD = username || filename (no separator -- design flaw, see analysis)
+  - Random IV per write, tag stored separately in FileMeta struct
+
+Without the key, GCM authentication prevents forging ciphertext.
+
+Prerequisite: crack TEAM_FLAG via offline PBKDF2 brute-force:
+  user1 salt     : f6b3d6bc8c8a5e23c45eece2e80b27ba
+  user1 key_hash : 15cd2456e7fba758ac974e6489c9d84d2d822984b16cbcbd3e1cc7c4d8d1eb43
+  hashcat mode   : 12000 (PBKDF2-HMAC-SHA256)
+  hash format    : sha256:10000:<salt_b64>:<hash_b64>
+
+AAD design flaw: username||filename with no separator means user "user1f"
+with file "ile1" produces the same AAD as user "user1" with file "file1".
+This does not break integrity since the encryption key is user-specific
+(per-user salt in PBKDF2), but it is a notable implementation defect.

@@ -1,0 +1,17 @@
+NOT APPLICABLE to CPSLO (team 108) via CLI arguments or stdin.
+
+CPSLO's stor.c has no reachable stack buffer overflow:
+  - username/filename stored in heap-allocated structs (char [256]), bounded
+    by strlen >= MAX_NAME check before any strcpy.
+  - key passed directly to PBKDF2 (no local copy).
+  - write content heap-allocated via malloc(strlen(content)).
+  - No stdin reads anywhere in the codebase.
+
+win() is at PIE offset 0xe7d. The binary has -fno-stack-protector and
+execstack, so a stack smash would trivially reach win(). However, no
+command-line path provides the necessary overflow.
+
+The dlmalloc 2.7.2 calloc/unlink heap exploit (see crash-dlmalloc-CPSLO)
+is the theoretically correct path to win(), but requires planting a crafted
+enc.db before the commands run -- not possible through ./stor commands alone
+in the contest grader format.

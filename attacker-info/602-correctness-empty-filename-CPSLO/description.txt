@@ -1,0 +1,12 @@
+Bug: create succeeds with an empty filename instead of rejecting it.
+
+Spec: a filename must be a non-empty string. Calling create with -f ""
+must print "invalid" to stdout and exit 255.
+
+Root cause: stor.c only checks strlen(file) >= MAX_NAME (256), which allows
+length 0 through. The reference implementation (stor-old.c) explicitly
+rejects empty filenames with: if (strlen(file) == 0) return invalid();
+
+Trigger: register alice, then ./stor -u alice -f "" create
+Expected: second command stdout = "invalid", exit 255
+Observed: second command stdout = "", exit 0 (file with empty name is created)

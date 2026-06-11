@@ -1,0 +1,36 @@
+CORRECTNESS (25 pts) — register rejects surplus flags that the reference ignores
+
+ROOT CAUSE
+jojo's validate() is strict: for CMD_REGISTER it rejects the request if any of
+-f / -i / -o or inline text is present (build/args.c:31-34):
+
+    case CMD_REGISTER:
+        if (r->key == NULL) return 0;
+        if (r->file || r->infile || r->outfile || r->have_text) return 0;  // <-- here
+        return 1;
+
+So `register` accompanied by a stray -f (or -o, -i) makes args_parse return 0,
+and main() prints "invalid" / exits 255 (stor.c:42-43).
+
+The reference implementation does NOT validate flag combinations per command.
+It dispatches on the action word and only consults the flags each action needs;
+extra flags are silently ignored (starter-package/build/stor.c register branch
+at line ~320-350 only reads -u and -k for register). A register carrying an
+unused -f therefore SUCCEEDS with exit 0 and empty stdout.
+
+EMPIRICALLY CONFIRMED AGAINST THE REFERENCE ORACLE BINARY
+  command:  stor -u alice -k s -f x register
+  oracle (starter-package/build/stor):  exit 0, stdout ""   (user registered)
+  target (jojo):                         exit 255, stdout "invalid"
+
+TRIGGER (fresh DB, single command)
+  stor -u alice -k s -f x register
+    -> oracle: registers alice, exit 0, no output
+    -> jojo:   prints "invalid", exit 255
+
+The test.json encodes the oracle behavior (exit 0, empty stdout). The grader
+flags jojo's exit-255/"invalid" as a mismatch.
+
+CONFIDENCE: HIGH. Pure argument-parsing policy difference, verified by running
+the shipped reference binary. Same defect occurs for register with -o or -i, and
+analogously the reference is permissive about other surplus flags jojo rejects.

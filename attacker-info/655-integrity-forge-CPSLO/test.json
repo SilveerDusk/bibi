@@ -1,0 +1,6 @@
+{
+  "target_team": 108,
+  "type": "integrity",
+  "commands": [],
+  "_NOTE": "CPSLO uses AES-256-GCM with a random per-write IV and a separate GCM authentication tag stored in the FileMeta struct. Without TEAM_FLAG (the shared key for both users) it is computationally infeasible to forge valid ciphertext. The only path is cracking PBKDF2-HMAC-SHA256 offline (user1 salt=f6b3d6bc8c8a5e23c45eece2e80b27ba, key_hash=15cd2456e7fba758ac974e6489c9d84d2d822984b16cbcbd3e1cc7c4d8d1eb43, 10000 iters). If TEAM_FLAG is recovered, re-encrypt file1 content with the new value and plant the modified enc.db."
+}

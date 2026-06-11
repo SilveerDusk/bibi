@@ -1,0 +1,11 @@
+{
+  "submission_id": 656,
+  "test_name": "security-shellcode-CPSLO",
+  "attacking_team": "jojo (109)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Security",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/656"
+}

@@ -1,0 +1,12 @@
+Bug: register succeeds with an empty username instead of rejecting it.
+
+Spec: a username must be a non-empty string. Calling register with -u ""
+must print "invalid" to stdout and exit 255.
+
+Root cause: stor.c only checks strlen(user) >= MAX_NAME (256), which allows
+length 0 through. The reference implementation (stor-old.c) explicitly
+rejects empty usernames with: if (strlen(user) == 0) return invalid();
+
+Trigger: ./stor -u "" -k somekey register
+Expected: stdout = "invalid", exit 255
+Observed: stdout = "", exit 0 (user with empty username is registered)

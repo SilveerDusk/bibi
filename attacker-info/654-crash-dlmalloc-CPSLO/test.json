@@ -1,0 +1,11 @@
+{
+  "target_team": 108,
+  "type": "crash",
+  "commands": [
+    {
+      "program": "stor",
+      "args": ["-u", "x", "-k", "k", "register"]
+    }
+  ],
+  "_NOTE": "CPSLO uses old fixed-size struct enc.db format (no STOR magic). gen_db.py targets the new format and is incompatible. To trigger the calloc overflow (file_count=0x40000000), a crafted enc.db in the OLD format must be planted before the command runs. The old format has pervasive null bytes in the struct padding that cannot be passed via argv or stdin. This crash path requires a grader-side --plant-db capability or an out-of-band file injection mechanism that is not present in the standard contest command format."
+}

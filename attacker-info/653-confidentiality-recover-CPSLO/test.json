@@ -1,0 +1,12 @@
+{
+  "target_team": 108,
+  "type": "confidentiality",
+  "commands": [
+    {
+      "program": "stor",
+      "args": ["-u", "user2", "-k", "TEAM_FLAG_HERE", "-f", "file2", "read"],
+      "output": "CONFIDENTIALITY_FLAG_HERE"
+    }
+  ],
+  "_TODO": "Replace TEAM_FLAG_HERE with cracked TEAM_FLAG and CONFIDENTIALITY_FLAG_HERE with the decrypted 48-byte flag. Crack via: hashcat -m 12000 'sha256:10000:W7UwgaFRPayl1V06EYxLsQ==:4yXubkBEibj35SRO1htp/hFVkmAAxcnouzYU0au6d5M=' wordlist.txt. Decrypt with script in description.txt."
+}

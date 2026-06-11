@@ -1,0 +1,10 @@
+Bug: an empty string username is accepted instead of being rejected with
+exit 255.
+
+Spec: -u requires a non-empty username.  The implementation checks
+strlen(user) >= MAX_NAME but not strlen(user) == 0, so empty string passes
+validation and a user with an empty name is created.
+
+Trigger: register with -u '' (empty username).
+Expected (oracle): exit 255, stdout 'invalid'.
+Actual (bug): exit 0.

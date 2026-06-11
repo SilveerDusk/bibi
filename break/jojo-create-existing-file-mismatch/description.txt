@@ -1,0 +1,59 @@
+CORRECTNESS BREAK — re-create of an existing file errors instead of succeeding
+
+Root cause
+----------
+The reference implementation treats `create` of an already-existing
+(owner, filename) pair as an idempotent no-op that SUCCEEDS:
+
+    starter-package/build/stor.c:359-362
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx >= 0) {
+            SUCCESS_OUT();              // prints nothing, exit 0
+        }
+
+The jojo target (modular design: dispatch in stor.c, handlers in cmd.c)
+instead treats it as a hard error. `cmd_create` returns -1 when the file
+already exists, and main maps any non-zero rc to the "invalid" contract:
+
+    jojo-109/.../build/cmd.c:14-21  (cmd_create)
+        if (!db_find_user(db, req->user)) return -1;   // user must exist
+        if (db_find_file(db, req->user, req->file)) return -1;  // duplicate file
+        return db_add_file(db, req->user, req->file);
+
+    jojo-109/.../build/stor.c:51     rc = cmd_create(db, &req);
+    jojo-109/.../build/stor.c:57-60  if (rc != 0) { db_free(db); fail(); }
+
+    fail()  (stor.c:28-29)
+        puts("invalid");               // "invalid\n"
+        exit(255);
+
+So issuing `create` twice for the same user+file diverges:
+  - oracle:  exit 0, stdout ""
+  - target:  exit 255, stdout "invalid\n"
+
+Trigger
+-------
+Uses a freshly-registered attacker account (allowed by the rules; needs no
+victim key and does not touch the shipped user1/user2 records):
+
+  1. register attacker "atk" with key "s"        -> exit 0, "" (cmd_register, cmd.c:7)
+  2. create file "note" for "atk"                -> exit 0, "" (file now exists)
+  3. create file "note" for "atk" AGAIN          -> DIVERGES
+
+On step 3 the oracle returns exit 0 with empty stdout (idempotent success),
+while the target prints "invalid" and exits 255. The divergence is in BOTH
+exit code AND stdout, so it does not depend on how the grader treats a
+trailing newline.
+
+The "expected" array encodes the oracle behavior. The correctness grader
+compares the target run against this oracle and flags the mismatch on the
+third command.
+
+Confidence: HIGH. The target source unambiguously returns -1 on a duplicate
+create (cmd.c:18-19), which main converts to invalid()/exit 255 (stor.c:57-60,
+28-29). The only residual assumption is that the grader's "correct oracle"
+matches the shipped starter-package reference semantics (idempotent-success
+create), which is the canonical reference distributed to all teams. The
+identical attack is already confirmed VALID against sensodyne (#681) and
+UW_Tacoma (#587). (Note: jojo is the team whose create-no-user break #541 is
+currently the only valid break against us.)

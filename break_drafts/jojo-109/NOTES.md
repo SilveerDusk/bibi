@@ -85,3 +85,70 @@ leaks plaintext. Matches the README build recipe exactly.
 ## Recommendation
 Submit finding #1 (`text-is-command-word/`). It is the only high-confidence,
 fully machine-checkable break against this otherwise solid submission.
+
+## DEEP DIVE (100pt/crash hunt)
+
+Goal of this pass: find the 50pt (crash) and/or 100pt (integrity/confidentiality/
+control-flow) bug(s) that other teams scored. RESULT: none are feasible. jojo's
+application code is genuinely memory-safe and the crypto is textbook-correct.
+The 175 points scored against jojo were almost certainly CORRECTNESS breaks
+(the broad-pattern bugs below — note break/ shows duplicate-create and
+register-takeover scoring against other teams).
+
+### Method
+- Built jojo natively with clang -fsanitize=address,undefined and fuzzed:
+  * 6000+ single commands (random argv + stdin)         -> 0 real signals
+  * 800+ multi-command sequences reusing enc.db          -> 0 real signals
+  (All exit-255 results are the normal "invalid" path; ASan stderr always empty.)
+- Differential-fuzzed jojo vs the SHIPPED REFERENCE ORACLE
+  (starter-package/build/stor, which runs on macOS arm64): ~4000 sequences.
+- Note: an apparent "register fails at username length 256" was an ASAN-ONLY
+  artifact; the plain build handles arbitrarily long names fine. NOT a bug.
+- Large-write DoS check: 63MB stdin write completes in 0.35s (slurp cap +
+  secretbox are fast). No >60s hang anywhere.
+
+### CRASH (50) — STILL NOT FOUND (high confidence)
+ASan/UBSan clean across all fuzzing. slurp cap (io.c:8,21,33) holds; the only
+buffer the cap lets reach 128MB is freed and bailed cleanly. db_write_content
+size math is bounded (db.c:409). db_load is not an attacker surface (fresh DB
+for crash runs; mutating commands only ever serialize well-formed data).
+
+### INTEGRITY (100) — STILL NOT FEASIBLE
+Per-record secretbox keyed by the OWNER's Argon2id key defeats forgery/move.
+Keyless re-register is correctly rejected (cmd.c:9-11) — CONFIRMED. `create`
+needs no key but only ADDS new files; it cannot touch file1's stored bytes.
+No path mutates an existing record's ciphertext without auth_derive succeeding.
+
+### CONFIDENTIALITY (100) — STILL NOT FEASIBLE
+enc.db re-parsed: user1 salt 3d68…, user2 salt a759… (DISTINCT); all four
+nonces distinct (no reuse) even though both users share the same $TEAM_FLAG
+password. K differs per user via salt. No plaintext leakage. Requires brute
+force of Argon2id-interactive — out of scope. No recovered plaintext claimed.
+
+### CONTROL FLOW / win() (100) — STILL NOT FOUND
+No stack overflow reachable; all buffers heap and bounded; no hijack primitive.
+
+### NEW correctness breaks found via the oracle binary (drafted, ready)
+These are the realistically-scorable bugs (25pt each in the prompt's scale):
+
+1. `correctness-invalid-trailing-newline/` — UPGRADED to MEDIUM-HIGH.
+   Confirmed against the real oracle: oracle prints "invalid" (7 bytes), jojo
+   prints "invalid\n" (8 bytes, puts() at stor.c:28). Valid read output is
+   byte-identical, so the only diff is the error token's trailing newline.
+   Affects EVERY error path.
+
+2. `register-extra-flag/` — HIGH. jojo's validate() rejects register carrying a
+   stray -f/-o/-i (args.c:31-34); the reference ignores surplus flags.
+   `stor -u alice -k s -f x register`: oracle exit 0/"", jojo exit 255/"invalid".
+
+3. `duplicate-create-idempotent/` — HIGH. Same class that scored vs teams
+   114/107/104. Reference treats re-create as idempotent success
+   (starter stor.c:359-362); jojo returns -1 -> invalid (cmd.c:18-20).
+   register atk / create note / create note again: 3rd diverges (oracle 0, jojo 255).
+
+Plus the already-drafted `text-is-command-word/` (HIGH).
+
+### Bottom line
+No 50pt or 100pt bug exists. Submit the four correctness breaks; the strongest
+are duplicate-create-idempotent and register-extra-flag (HIGH, oracle-verified),
+then text-is-command-word (HIGH), then trailing-newline (MEDIUM-HIGH).

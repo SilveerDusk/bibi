@@ -1,0 +1,7 @@
+dlmalloc 2.7.2 calloc integer overflow — crafted enc.db with nfile=0x10000001
+causes a 32-bit multiply wrap, under-allocating the file array.
+The subsequent loop OOBs at index 1, corrupting heap metadata.
+Expected: SIGSEGV or SIGABRT.
+
+TODO: generate the malformed enc.db with harness/gen_db.py and embed
+it via --plant-db, or base64-encode it into a write stdin payload.

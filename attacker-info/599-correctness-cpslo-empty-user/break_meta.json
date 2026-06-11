@@ -1,0 +1,11 @@
+{
+  "submission_id": 599,
+  "test_name": "correctness-cpslo-empty-user",
+  "attacking_team": "jojo (109)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Correctness",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/599"
+}

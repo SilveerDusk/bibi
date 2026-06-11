@@ -1,0 +1,11 @@
+{
+  "submission_id": 530,
+  "test_name": "confidentiality-recover-CPSLO",
+  "attacking_team": "jojo (109)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Confidentiality",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/530"
+}

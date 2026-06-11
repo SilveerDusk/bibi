@@ -1,0 +1,6 @@
+{
+  "target_team": 108,
+  "type": "security",
+  "commands": [],
+  "_NOTE": "CPSLO has no reachable stack overflow via CLI. win() is at PIE offset 0xe7d. The executable stack and absent stack canary make this binary exploitable in principle, but the only path to win() is via the dlmalloc 2.7.2 heap unlink exploit triggered by a crafted enc.db -- which requires out-of-band file injection not supported in the ./stor-only command format. No exploit payload possible without --plant-db or arbitrary shell access."
+}

@@ -1,0 +1,56 @@
+CORRECTNESS BREAK — re-create of an existing file errors instead of succeeding
+
+Root cause
+----------
+The reference implementation treats `create` of an already-existing
+(owner, filename) pair as an idempotent no-op that SUCCEEDS:
+
+    starter-package/build/stor.c:359-362
+        int file_idx = db_find_file(&db, user, file);
+        if (file_idx >= 0) {
+            SUCCESS_OUT();              // prints nothing, exit 0
+        }
+
+The via target instead treats it as a hard error. `do_create` adds the file
+via `db_add_file`, which returns 0 when the file already exists; `do_create`
+then maps that to invalid():
+
+    via-102/.../build/stor.c:1140  (do_create)
+        if (!db_add_file(db, args->username, args->filename)) return invalid();
+
+    via-102/.../build/stor.c:736-738  (db_add_file)
+        if (find_file(db, user, name)) return 0;   // already exists -> 0
+
+    via-102/.../build/stor.c:67-70   (invalid)
+        printf("invalid\n");
+        return 255;                    // -> exit 255
+
+So issuing `create` twice for the same user+file diverges:
+  - oracle:  exit 0, stdout ""
+  - target:  exit 255, stdout "invalid\n"
+
+Trigger
+-------
+Uses a freshly-registered attacker account (allowed by the rules; needs no
+victim key and does not touch the shipped user1/user2 records):
+
+  1. register attacker "atk" with key "s"        -> exit 0, ""  (do_register, stor.c:1122)
+  2. create file "note" for "atk"                -> exit 0, "" (file now exists)
+  3. create file "note" for "atk" AGAIN          -> DIVERGES
+
+On step 3 the oracle returns exit 0 with empty stdout (idempotent success),
+while the target prints "invalid" and exits 255. The divergence is in BOTH
+exit code AND stdout, so it does not depend on how the grader treats a
+trailing newline.
+
+The "expected" array encodes the oracle behavior. The correctness grader
+compares the target run against this oracle and flags the mismatch on the
+third command.
+
+Confidence: HIGH. The target source unambiguously returns invalid() on a
+duplicate create (db_add_file returns 0 on an existing file, stor.c:738; mapped
+to invalid() at stor.c:1140). The only residual assumption is that the grader's
+"correct oracle" matches the shipped starter-package reference semantics
+(idempotent-success create), which is the canonical reference distributed to
+all teams. The identical attack is already confirmed VALID against sensodyne
+(#681) and UW_Tacoma (#587).

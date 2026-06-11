@@ -1,0 +1,17 @@
+{
+  "target_team": 108,
+  "type": "confidentiality",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user2",
+        "-f",
+        "file2",
+        "read"
+      ]
+    }
+  ],
+  "_TODO": "Replace stub commands with real exploit before submitting."
+}
