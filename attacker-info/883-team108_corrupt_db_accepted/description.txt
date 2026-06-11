@@ -1,0 +1,26 @@
+Target team: 108
+Bug title: Heavily corrupted enc.db still decrypts successfully
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Write seed to a file, overwrite bytes 12-31 of enc.db with 0xFF, then read
+  with the correct key.
+
+Observed behavior:
+  read returns seed with exit 0.
+
+Expected behavior:
+  Substantial tampering of enc.db must be detected. read should print invalid and
+  exit 255.
+
+Why this violates the spec or security goal:
+  The security model requires forgery detection when enc.db is modified without
+  the secret. Accepting corrupted state defeats integrity guarantees.
+
+Suspected file and line:
+  stor108.c db_load and decrypt_data: no authentication of full database structure.
+
+Minimal reproducer:
+  python3 -c "d=bytearray(open('enc.db','rb').read());d[12:32]=bytes([0xff]*20);open('enc.db','wb').write(d)"
+  stor -u alice -k k -f f read

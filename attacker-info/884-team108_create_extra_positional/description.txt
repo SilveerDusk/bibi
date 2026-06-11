@@ -1,0 +1,23 @@
+Target team: 108
+Bug title: create accepts an extra positional argument
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Register alice, then create notes with a trailing "extra" argument.
+
+Observed behavior:
+  create succeeds with exit 0.
+
+Expected behavior:
+  create takes no inline text. An extra positional argument is invalid and must
+  produce invalid/255.
+
+Why this violates the spec or security goal:
+  Malformed argument combinations must be rejected per the single error path.
+
+Suspected file and line:
+  stor108.c create handler: does not validate optind+1 < argc.
+
+Minimal reproducer:
+  stor -u alice -f notes create extra
