@@ -1,2 +1,0 @@
-{"target_team":0,"type":"correctness","commands":[
- {"program":"stor","args":["-u","","-k","pass","register"]}]}

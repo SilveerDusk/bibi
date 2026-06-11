@@ -1,3 +1,0 @@
-{"target_team":0,"type":"correctness","commands":[
- {"program":"stor","args":["-u","alice","-k","pass","register"]},
- {"program":"stor","args":["-u","alice","-f","","create"]}]}

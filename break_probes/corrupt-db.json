@@ -1,6 +1,0 @@
-{"target_team":0,"type":"correctness","commands":[
- {"program":"stor","args":["-u","alice","-k","k","register"]},
- {"program":"stor","args":["-u","alice","-f","f","create"]},
- {"program":"stor","args":["-u","alice","-k","k","-f","f","write","seed"]},
- {"program":"sh","args":["-c","python3 -c \"import sys; d=bytearray(open('enc.db','rb').read());\nfor i in range(12,min(32,len(d))): d[i]=0xff\nopen('enc.db','wb').write(d)\""]},
- {"program":"stor","args":["-u","alice","-k","k","-f","f","read"]}]}
