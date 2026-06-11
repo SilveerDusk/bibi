@@ -1,0 +1,33 @@
+CORRECTNESS BREAK (candidate) — error output has an extra trailing newline
+
+Root cause
+----------
+The spec says every error must "print exactly `invalid`". The reference
+implementation prints it WITHOUT a trailing newline:
+
+    starter-package/build/stor.c:47-50
+        static int invalid(void) { printf("invalid"); return 255; }
+
+The UW_Tacoma target appends a newline:
+
+    UW_Tacoma-114/.../build/stor.c:34-37
+        static void die_invalid(void) { printf("invalid\n"); exit(255); }
+
+So on ANY error path the target emits "invalid\n" while the oracle emits
+"invalid". Both exit 255.
+
+Trigger
+-------
+A single command with an unknown action ("nonsense") drives the common error
+path:
+  - oracle:  stdout "invalid"   (no newline), exit 255
+  - target:  stdout "invalid\n" (newline),    exit 255
+
+Confidence: MEDIUM. The byte-level divergence is certain from the two
+sources. The risk is grader-side: (a) the grader may trim/normalize trailing
+whitespace before comparing stdout, or (b) the grader's canonical oracle may
+itself print the newline. The "expected" here encodes the no-newline starter
+behavior. If the grader does exact-match without trimming, this flags on every
+team that uses printf("invalid\n"); if it trims, this test is a no-op (still
+harmless). Lower priority than the create-existing divergence, which differs in
+exit code as well as output and is robust to whitespace normalization.
