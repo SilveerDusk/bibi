@@ -1,13 +1,50 @@
 {
-  "target_team": 103,
-  "type": "integrity",
+  "target_team": 102,
+  "type": "correctness",
   "commands": [
     {
-      "program": "python3",
+      "program": "stor",
       "args": [
-        "-c",
-        "import struct; import hashlib; import hmac; f=open('enc.db','rb+'); buf=bytearray(f.read()); db_salt=buf[8:40]; uc=struct.unpack('<I', buf[72:76])[0]; ublock_sz=uc*152; users=buf[76:76+ublock_sz]; mac_key=hashlib.blake2b(db_salt+buf[72:76+ublock_sz], digest_size=32).digest(); fc_offset=76+ublock_sz; fc=struct.unpack('<I', buf[fc_offset:fc_offset+4])[0]; p=fc_offset+4; file1_idx=p+92-4; buf[file1_idx:file1_idx+4]=b'\\x00\\x00\\x00\\x00'; global_mac=hmac.new(mac_key, buf[72:], hashlib.sha512).digest()[:32]; buf[40:72]=global_mac; f.seek(0); f.write(buf); f.close();"
+        "-u",
+        "user1",
+        "-k",
+        "testkey",
+        "register"
       ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-f",
+        "emptyfile",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "testkey",
+        "-f",
+        "emptyfile",
+        "read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "",
+      "exit": 0
     }
   ]
 }

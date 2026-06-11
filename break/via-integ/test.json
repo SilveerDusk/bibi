@@ -1,14 +1,50 @@
 {
-  "target_team": 105,
-  "type": "integrity",
+  "target_team": 99,
+  "type": "correctness",
   "commands": [
     {
-      "program": "sed",
+      "program": "stor",
       "args": [
-        "-i",
-        "s/^F b5b10ddd8ed389f402b82fdd0083f5b3a59e341ca015258318fa31aa6d98272f e2b6560a84d3b489e758198b7fb1f4c3bc1979dfea55ad2984b3b6ef943bbf59 .*/F b5b10ddd8ed389f402b82fdd0083f5b3a59e341ca015258318fa31aa6d98272f e2b6560a84d3b489e758198b7fb1f4c3bc1979dfea55ad2984b3b6ef943bbf59 - - -/",
-        "enc.db"
+        "-u",
+        "user1",
+        "-k",
+        "testkey",
+        "register"
       ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-f",
+        "emptyfile",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "testkey",
+        "-f",
+        "emptyfile",
+        "read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "",
+      "exit": 0
     }
   ]
 }
