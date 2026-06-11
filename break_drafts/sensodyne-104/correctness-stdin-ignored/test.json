@@ -1,0 +1,16 @@
+{
+  "target_team": 104,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "atk", "-k", "atkkey", "register"]},
+    {"program": "stor", "args": ["-u", "atk", "-f", "note", "create"]},
+    {"program": "stor", "args": ["-u", "atk", "-k", "atkkey", "-f", "note", "write"], "stdin": "STDIN_PAYLOAD_42"},
+    {"program": "stor", "args": ["-u", "atk", "-k", "atkkey", "-f", "note", "read"]}
+  ],
+  "expected": [
+    {"stdout": "", "exit": 0},
+    {"stdout": "", "exit": 0},
+    {"stdout": "", "exit": 0},
+    {"stdout": "STDIN_PAYLOAD_42", "exit": 0}
+  ]
+}

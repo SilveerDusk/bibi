@@ -1,0 +1,49 @@
+### STATUS: REJECTED — DO NOT SUBMIT ###
+The reference implementation ALSO ignores stdin for write: it reads write
+content only from inline <text> (argv) or -i <file>. There is NO stdin read path
+anywhere in starter-package/build/stor.c (confirmed by grep + reading main()),
+and the authoritative functionality suite (tests.json) never feeds write content
+over stdin. A stdin-fed write therefore stores EMPTY content in BOTH the oracle
+and the target -> their outputs MATCH -> the break is judged INVALID.
+Kept for the record only. See break_drafts/SUMMARY.md.
+------------------------------------------------------------------------------
+CORRECTNESS — `write` ignores stdin (writes empty content instead)
+
+Category: correctness (25)
+Target team: 104
+
+ROOT CAUSE
+  stor.c contains NO code that reads standard input. The only fread() calls are
+  for the database file (stor.c:391) and for an explicit `-i` input file
+  (stor.c:906). There is no read(0)/fgets/getline/scanf/getchar anywhere.
+
+  In CMD_WRITE, when no `-i` is given the content is taken solely from an inline
+  argv token:
+      const char *txt = a.text ? a.text : "";   // stor.c:916
+      content_len = strlen(txt);                 // stor.c:917
+  and `a.text` is only ever set from argv during parsing (stor.c:822). So a
+  `write` with neither `-i` nor an inline text token writes the EMPTY STRING,
+  silently discarding anything piped on stdin.
+
+  The program spec lists write input as "-i file / inline / stdin", and the
+  spec's own example feeds the payload via "stdin". A correct oracle that reads
+  stdin stores "STDIN_PAYLOAD_42"; this build stores "".
+
+TEST
+  1. register attacker user `atk`.
+  2. create file `note`.
+  3. write to `note` with the payload on STDIN and no inline text / no -i.
+  4. read `note` back to stdout.
+
+EXPECTED (oracle that reads stdin)
+  The final `read` prints `STDIN_PAYLOAD_42`.
+
+OBSERVED (team 104 build)
+  The final `read` prints empty output — stdin was ignored at write time, so the
+  stored content is the empty string. Output differs from the oracle => correctness.
+
+NOTES
+  Payload deliberately has no trailing newline to avoid the `-i` newline-stripping
+  ambiguity (stor.c:910) confusing the comparison; stdin handling should not strip.
+  If the grader's oracle does NOT read stdin (treats it as empty too), this test
+  is inert — but the spec explicitly enumerates stdin as a supported input method.

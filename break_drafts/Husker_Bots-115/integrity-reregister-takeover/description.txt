@@ -1,0 +1,35 @@
+INTEGRITY (100 pts) — Unauthenticated account takeover via re-register
+
+ROOT CAUSE
+In the register handler (stor.c:473-491), find_user() is called for the
+requested username. If the user ALREADY EXISTS, the "create new user" branch
+(lines 477-482) is skipped, but execution still falls through to lines 485-487,
+which generate a FRESH random salt and re-derive key_hash from the attacker-
+supplied key — overwriting user1's stored salt and key verifier. There is no
+check that the caller proves knowledge of the existing key. The reference
+implementation (starter-package/build/stor.c:333-335) explicitly REJECTS
+register for an existing username (returns "invalid", exit 255).
+
+EFFECT
+After this single command, user1's stored salt/key_hash correspond to the
+attacker's key. file1's ciphertext is still on disk, but it was bound to a key
+derived from the ORIGINAL secret. When the grader re-reads user1/file1 with the
+REAL key, verify_key() now compares the real key against the attacker-installed
+hash and FAILS (or the subsequent AEAD/key check fails), so the read returns
+"invalid" instead of the original flag content.
+
+WHY IT IS A VALID INTEGRITY BREAK
+The grader's success condition is: "Re-reading user1/file1 with the real key
+returns content different from the original." The original was the integrity
+flag; after the attack it is no longer recoverable with the real key (read
+errors / returns different content). The victim's data was modified without the
+key.
+
+HOW THE TEST TRIGGERS IT
+A single command re-registers "user1" with the attacker key "attacker_pw",
+silently overwriting user1's credentials. No victim key, no extra setup.
+
+FALLBACK
+This same command is also a guaranteed CORRECTNESS break (25 pts): the reference
+returns "invalid"/255 on re-register while Husker_Bots returns 0. See the
+sibling draft correctness-reregister-allowed/.

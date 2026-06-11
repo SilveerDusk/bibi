@@ -1,3 +1,12 @@
+### STATUS: REJECTED — DO NOT SUBMIT ###
+The reference implementation ALSO ignores stdin for write: it reads write
+content only from inline <text> (argv) or -i <file>. There is NO stdin read path
+anywhere in starter-package/build/stor.c (confirmed by grep + reading main()),
+and the authoritative functionality suite (tests.json) never feeds write content
+over stdin. A stdin-fed write therefore stores EMPTY content in BOTH the oracle
+and the target -> their outputs MATCH -> the break is judged INVALID.
+Kept for the record only. See break_drafts/SUMMARY.md.
+------------------------------------------------------------------------------
 Correctness: `write` ignores stdin entirely.
 
 Spec: "stor -u <user> -k <key> -f <file> write <text>" takes content "via -i

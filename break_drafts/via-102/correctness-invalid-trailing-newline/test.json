@@ -1,0 +1,10 @@
+{
+  "target_team": 102,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-k", "s", "register"]}
+  ],
+  "expected": [
+    {"stdout": "invalid", "exit": 255}
+  ]
+}

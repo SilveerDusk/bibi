@@ -1,0 +1,18 @@
+CORRECTNESS (25 pts) — extra trailing newline on the "invalid" error token
+
+ROOT CAUSE
+The reference prints the error token as exactly "invalid" with NO trailing
+newline (starter-package/build/stor.c:47-48, printf("invalid")). This target
+emits "invalid\n" (puts("invalid") at stor.c:28), adding a trailing newline.
+
+ORACLE vs TARGET
+Command 'register' with -u omitted is an error for both.
+  - Reference oracle stdout: "invalid"   (exit 255)
+  - Target stdout:           "invalid\n" (exit 255)
+If the grader compares stdout byte-for-byte (the functionality suite specifies
+expected stdout exactly as "invalid"), the trailing newline makes the outputs
+differ -> valid correctness break.
+
+CONFIDENCE: MEDIUM. Depends on the grader NOT trimming trailing whitespace before
+comparison. No penalty for trying. The trigger is any error path; we use the
+missing-username error so no DB state is touched.
