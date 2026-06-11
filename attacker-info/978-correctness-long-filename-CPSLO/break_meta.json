@@ -1,0 +1,11 @@
+{
+  "submission_id": 978,
+  "test_name": "correctness-long-filename-CPSLO",
+  "attacking_team": "jojo (109)",
+  "target_team": "CPSLO (108)",
+  "status": "Tested",
+  "result": "Break valid",
+  "type": "Correctness",
+  "fix_status": "Active",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/978"
+}

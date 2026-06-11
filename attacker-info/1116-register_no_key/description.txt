@@ -1,0 +1,8 @@
+Test case: register_no_key
+Type: correctness
+Target team: 108
+
+What it checks: register requires -k; omitting it is invalid.
+How it triggers: register alice with no -k.
+Expected: invalid/255.
+Counts as a break if: registration succeeds without key.

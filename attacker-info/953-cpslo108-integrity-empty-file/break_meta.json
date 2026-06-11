@@ -1,0 +1,11 @@
+{
+  "submission_id": 953,
+  "test_name": "cpslo108-integrity-empty-file",
+  "attacking_team": "GreatTeam26 (103)",
+  "target_team": "CPSLO (108)",
+  "status": "Tested",
+  "result": "Break valid",
+  "type": "Integrity",
+  "fix_status": "Active",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/953"
+}

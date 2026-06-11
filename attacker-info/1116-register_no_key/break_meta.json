@@ -1,0 +1,11 @@
+{
+  "submission_id": 1116,
+  "test_name": "register_no_key",
+  "attacking_team": "0xwizards (105)",
+  "target_team": "CPSLO (108)",
+  "status": "Tested",
+  "result": "Break valid",
+  "type": "Correctness",
+  "fix_status": "Active",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/1116"
+}

@@ -1,0 +1,12 @@
+Bug: register rejects a 256-character key that the spec permits.
+
+stor.c defines MAX_NAME=256 and checks strlen(key) >= MAX_NAME.
+A 256-char key has strlen=256 >= 256 and is rejected with "invalid" exit 255.
+
+The reference (stor-old.c) defines MAX_STR_LEN=4096 and checks
+strlen(key) > MAX_STR_LEN — a 256-char key has strlen=256 <= 4096
+so it is accepted (exit 0).
+
+Trigger: ./stor -u alice -k "k"*256 register
+Expected (spec): exit 0
+Observed: stdout="invalid", exit 255

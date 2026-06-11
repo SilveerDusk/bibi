@@ -1,0 +1,46 @@
+CPSLO-108 Confidentiality Break: enc.db key_hash IS the AES encryption key
+
+Vulnerability:
+CPSLO's stor.c uses PBKDF2-HMAC-SHA256 (10,000 iterations) to derive a 32-byte
+value from the user's password and a per-user random salt. This derived value is:
+  1. Stored as user.key_hash in enc.db (in plaintext)
+  2. Used directly as the AES-256-GCM encryption key for all of that user's files
+
+Because the same PBKDF2 output serves both as the password verifier AND as the AES
+key, anyone who can read enc.db (given in the break package) can extract the AES key
+without knowing the original password.
+
+Root cause (stor.c lines 52-54, 430-435):
+  hash_key(key, salt, db.users[n].key_hash);           // register: stores PBKDF2
+  hash_key(key, db.users[idx].salt, key_hash);          // write: re-derives PBKDF2
+  encrypt_data(plaintext, len, key_hash, ...);           // same value used as AES key
+
+  => user2.key_hash == AES-256-GCM key for file2
+
+Exploit steps:
+1. Read user2.key_hash directly from enc.db at bytes 0x244-0x263:
+   e325ee6e404489b8f3e5244ed61b6a2f1155926000c5c9e8fb6114d1aba77793
+
+2. Read file2 crypto parameters from enc.db:
+   IV  (0x6BC-0x6CB): fb495a66fdbb94f55c8ca230c572f565
+   tag (0x6CC-0x6DB): 4469d4eecb240c629ad20582ce51b99f
+   ct  (0x6E0-0x70F): 8bc7baea84db9b373117776ae44a5223315f24e6263bdcfd
+                       fd8f9df39a678987f079ebdeddb1f94a42a2cc95d91fa6a6
+
+3. Decrypt with AES-256-GCM, AAD = b"user2" || b"file2" (no separator, V4 flaw):
+   EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key_hash, iv)
+   EVP_DecryptUpdate(ctx, NULL, &len, "user2", 5)  // AAD
+   EVP_DecryptUpdate(ctx, NULL, &len, "file2", 5)  // AAD
+   EVP_DecryptUpdate(ctx, plaintext, &len, ct, 48)
+   EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, tag)
+   EVP_DecryptFinal_ex(...)
+
+4. Recovered CONFIDENTIALITY_FLAG (48 bytes):
+   f954f202f6ec0f0a1bdd082f95d104ebe06e742ab9813a1f
+
+Note: Python cryptography.AESGCM rejects 16-byte nonces; use OpenSSL EVP directly
+or the lower-level Cipher+GCM API to handle CPSLO's IV_SIZE=16 correctly.
+
+Fix: derive a separate verify token and encryption key:
+  PBKDF2(..., dklen=64) -> first 32 bytes = verify token, next 32 bytes = enc key
+  Store only the verify token in enc.db, never the encryption key.

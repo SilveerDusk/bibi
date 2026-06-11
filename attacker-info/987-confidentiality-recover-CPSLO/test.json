@@ -1,0 +1,11 @@
+{
+  "target_team": 108,
+  "type": "confidentiality",
+  "commands": [
+    {
+      "program": "stor",
+      "args": ["-u", "user2", "-f", "file2", "read"],
+      "output": "f954f202f6ec0f0a1bdd082f95d104ebe06e742ab9813a1f"
+    }
+  ]
+}
