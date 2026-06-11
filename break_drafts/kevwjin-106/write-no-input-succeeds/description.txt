@@ -1,3 +1,9 @@
+### STATUS: REJECTED — DO NOT SUBMIT ###
+The reference treats a write with no -i and no inline <text> as a valid EMPTY
+write that succeeds with exit 0 (starter-package/build/stor.c:421-448: content
+is NULL, plaintext_len=0, stores empty, SUCCESS_OUT). The target does the same,
+so there is no deviation. INVALID. See break_drafts/SUMMARY.md.
+------------------------------------------------------------------------------
 Correctness: `write` with no input source silently succeeds (stores empty content).
 
 In the `write` branch (stor.c:756-779), if neither `-i <infile>` nor an inline content

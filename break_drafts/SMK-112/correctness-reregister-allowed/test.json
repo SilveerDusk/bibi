@@ -2,9 +2,11 @@
   "target_team": 112,
   "type": "correctness",
   "commands": [
-    {"program": "stor", "args": ["-u", "user1", "-k", "attacker_pw", "register"]}
+    {"program": "stor", "args": ["-u", "atk", "-k", "pw1", "register"]},
+    {"program": "stor", "args": ["-u", "atk", "-k", "pw2", "register"]}
   ],
   "expected": [
+    {"stdout": "", "exit": 0},
     {"stdout": "invalid", "exit": 255}
   ]
 }

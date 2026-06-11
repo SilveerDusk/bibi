@@ -1,3 +1,11 @@
+### STATUS: REJECTED — DO NOT SUBMIT ###
+The reference IGNORES a stray -k on 'create' and succeeds (functionality suite
+test "create_no_key_required": create with -k present -> exit 0). If the target
+also ignores it, there is no deviation. This draft's premise (target rejects -k)
+would only break a team that REJECTS -k on create; TPT does not. Additionally the
+expected[] here uses wrong keys ("output"/"returncode" instead of
+"stdout"/"exit"). INVALID as written. See break_drafts/SUMMARY.md.
+------------------------------------------------------------------------------
 Correctness break (LOW confidence): `create` accepts a stray -k.
 
 The create action (stor.c:749-755) rejects infile/outfile/content but not -k. The spec

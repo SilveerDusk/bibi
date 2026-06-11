@@ -1,21 +1,20 @@
-CORRECTNESS (25 pts) — register of an existing user is wrongly accepted
+CORRECTNESS (25 pts) — register of an already-registered user is wrongly accepted
 
 ROOT CAUSE
-The reference implementation rejects 'register' for a username that already
-exists: it returns "invalid" and exit code 255 (starter-package/build/stor.c:
-333-335). This target instead RE-REGISTERS the existing user (overwriting their
-salt/key verifier) and returns success (exit 0).
+The reference rejects 'register' for a username that already exists: it returns
+"invalid" and exit 255 (starter-package/build/stor.c:333-335). This target instead
+RE-REGISTERS the existing user (overwriting their salt/key verifier) and returns
+exit 0.
 
-ORACLE vs TARGET
-enc.db already contains user1. Running 'register -u user1 -k attacker_pw':
-  - Reference oracle: prints "invalid", exits 255  (expected[] below).
-  - Target:          re-registers user1, exits 0, no "invalid".
-The outputs differ -> valid correctness break.
+SELF-CONTAINED TEST (no enc.db seeding needed)
+  cmd[0]: register atk with key pw1  -> both oracle and target: exit 0
+  cmd[1]: register atk with key pw2  -> oracle: "invalid"/255 ; target: exit 0
+cmd[1] outputs differ -> valid correctness break.
 
 NOTE
-This is the safe 25-pt fallback for the 100-pt INTEGRITY break of the same bug
-(see sibling integrity-reregister* draft): the re-registration also destroys/
-locks-out user1/file1 so a real-key read no longer returns the original content.
-Submit the integrity version first; this correctness version is near-certain
-because it depends only on the documented reference behavior, not on how the
-grader interprets data destruction.
+This is the safe 25-pt sibling of the 100-pt INTEGRITY break (re-register against
+the shipped enc.db destroys/locks user1/file1 so a real-key read no longer returns
+the original content). See ../integrity-reregister*. Submit the integrity version
+first; this one is near-certain because it depends only on documented reference
+behavior. Confirmed locally with break_runner.py against the freshly built target
+and reference oracle.
