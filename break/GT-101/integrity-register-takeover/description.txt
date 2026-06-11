@@ -1,0 +1,21 @@
+Integrity break: keyless takeover/destruction of user1/file1 via the register command.
+
+Root cause: do_register (stor.c:355-402) never verifies prior ownership. When the
+target username already exists, the `if (u)` branch (stor.c:372-386) overwrites the
+stored salt and auth_tag with values derived from the ATTACKER-supplied key, and wipes
+every file's content (content_len=0, iv/hmac zeroed, ciphertext freed). The modified
+database is written back by save_db (stor.c:401).
+
+Exploit (against the shipped enc.db):
+  1. stor -u user1 -k attacker_owns_you register
+        -> re-keys user1 to the attacker's password and destroys file1's original
+           ciphertext (content_len set to 0).
+  2. stor -u user1 -f file1 create        (create requires no key; idempotent re-add)
+  3. stor -u user1 -k attacker_owns_you -f file1 write "PWNED_BY_ATTACKER"
+        -> writes attacker-controlled content under the attacker's key.
+
+Result: user1/file1 has been modified/destroyed without ever knowing user1's real key,
+violating the integrity property ("Modify user1's file1 without knowing their key").
+The original $INTEGRITY_FLAG content is no longer present. Reading file1 with the
+original key now fails verify_key (auth_tag was re-derived from the attacker key) and
+returns "invalid" instead of the original flag — the original content is unrecoverable.
