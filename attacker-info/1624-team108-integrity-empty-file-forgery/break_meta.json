@@ -1,0 +1,11 @@
+{
+  "submission_id": 1624,
+  "test_name": "team108-integrity-empty-file-forgery",
+  "attacking_team": "sensodyne (104)",
+  "target_team": "CPSLO (108)",
+  "status": "Tested",
+  "result": "Break valid",
+  "type": "Integrity",
+  "fix_status": "Active",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/1624"
+}

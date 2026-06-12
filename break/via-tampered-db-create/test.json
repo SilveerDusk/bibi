@@ -1,0 +1,74 @@
+{
+  "target_team": 102,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "notes",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "notes",
+        "write",
+        "seed"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cp enc.db enc.db.good && python3 -c \"d=bytearray(open('enc.db.good','rb').read()); d[16]^=0x04; open('enc.db','wb').write(d)\""
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "other",
+        "create"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "invalid",
+      "exit": 255
+    }
+  ]
+}

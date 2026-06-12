@@ -1,0 +1,13 @@
+tamper-filename — attacker-info turnaround targeting team 115 (husker)
+
+Origin: attacker-info/1117-tamper_filename_detected (submission 1117, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: tamper_filename_detected
+Type: integrity
+Target team: 108
+
+What it checks: tampering with plaintext filename in enc.db detected.
+How it triggers: create empty, edit empty to pwned in enc.db, read pwned.
+Expected: invalid/255.
+Counts as a break if: read succeeds.

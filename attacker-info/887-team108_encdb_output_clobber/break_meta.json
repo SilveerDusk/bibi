@@ -1,0 +1,11 @@
+{
+  "submission_id": 887,
+  "test_name": "team108_encdb_output_clobber",
+  "attacking_team": "0xwizards (105)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Integrity",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/887"
+}

@@ -1,0 +1,8 @@
+Test case: filebomb_many_small
+Type: crash
+Target team: 108
+
+What it checks: many small file create/write operations do not cause crash or hang.
+How it triggers: register, then create/write 700 tiny files in loop.
+Expected: completes within 60s, no crash.
+Counts as a break if: timeout, segfault, or structural DB corruption.

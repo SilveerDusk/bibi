@@ -1,0 +1,28 @@
+second-file-tamper — attacker-info turnaround targeting team 102 (via)
+
+Origin: attacker-info/1033-team108_second_file_tamper_undetected (submission 1033, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Tampered second file record still reads as valid
+Bug type: integrity
+Source testcase: extended_security_tests.sh Y6_second_file_tamper_detected
+
+After tampering bytes in the latter half of enc.db (where the second file record
+likely lives), reading that file with the correct key should fail. stor108 still
+returns "bad_data" with exit 0.
+
+Minimal reproducer:
+  stor -u alice -k k register
+  stor -u alice -f good create
+  stor -u alice -f bad create
+  stor -u alice -k k -f good write good_data
+  stor -u alice -k k -f bad write bad_data
+  flip bytes in latter half of enc.db (see test.json)
+  stor -u alice -k k -f bad read
+
+Observed: stdout=bad_data, exit 0
+Expected: stdout=invalid, exit 255
+
+Why this violates the spec: Per-record tampering must be detected on read when
+the correct secret is supplied.

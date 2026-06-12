@@ -1,0 +1,11 @@
+{
+  "submission_id": 1114,
+  "test_name": "filebomb_many_small",
+  "attacking_team": "0xwizards (105)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Crash",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/1114"
+}

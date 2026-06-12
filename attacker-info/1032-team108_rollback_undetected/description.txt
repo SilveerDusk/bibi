@@ -1,0 +1,23 @@
+Target team: 108
+Bug title: Whole-file rollback of enc.db is accepted and serves stale content
+Bug type: integrity
+Source testcase: extended_security_tests.sh Y7_rollback_served_stale
+
+Replacing enc.db with an older snapshot after a legitimate update should be
+detected. stor108 accepts the rollback and returns stale plaintext "version_one"
+with exit 0.
+
+Minimal reproducer:
+  stor -u user1 -k secret123 register
+  stor -u user1 -f file1 create
+  stor -u user1 -k secret123 -f file1 write version_one
+  cp enc.db enc.db.v1
+  stor -u user1 -k secret123 -f file1 write version_two
+  cp enc.db.v1 enc.db
+  stor -u user1 -k secret123 -f file1 read
+
+Observed: stdout=version_one, exit 0
+Expected: stdout=invalid, exit 255
+
+Why this violates the spec: External replacement of enc.db must trigger forgery
+detection when the correct key is supplied.

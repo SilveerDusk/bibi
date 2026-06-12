@@ -1,0 +1,13 @@
+create-no-file — attacker-info turnaround targeting team 104 (sensodyne)
+
+Origin: attacker-info/1112-create_no_file (submission 1112, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: create_no_file
+Type: correctness
+Target team: 108
+
+What it checks: create requires -f; omitting it is invalid.
+How it triggers: register alice, then create with no -f.
+Expected: register 0; create "invalid"/255.
+Counts as a break if: create succeeds with no filename.

@@ -1,0 +1,10 @@
+{
+  "target_team": 108,
+  "type": "integrity",
+  "commands": [
+    {"program": "stor", "args": ["-u", "alice", "-k", "secret123", "register"]},
+    {"program": "stor", "args": ["-u", "alice", "-f", "empty", "create"]},
+    {"program": "sh", "args": ["-c", "python3 -c \"d=bytearray(open('enc.db','rb').read()); i=d.find(b'empty'); assert i>=0; d[i:i+5]=b'pwned'; open('enc.db','wb').write(d)\""]},
+    {"program": "stor", "args": ["-u", "alice", "-k", "secret123", "-f", "pwned", "read"]}
+  ]
+}

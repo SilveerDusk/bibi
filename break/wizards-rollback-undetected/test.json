@@ -1,0 +1,102 @@
+{
+  "target_team": 105,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "secret123",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-f",
+        "file1",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "secret123",
+        "-f",
+        "file1",
+        "write",
+        "version_one"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cp enc.db enc.db.v1"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "secret123",
+        "-f",
+        "file1",
+        "write",
+        "version_two"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cp enc.db.v1 enc.db"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "user1",
+        "-k",
+        "secret123",
+        "-f",
+        "file1",
+        "read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "invalid",
+      "exit": 255
+    }
+  ]
+}

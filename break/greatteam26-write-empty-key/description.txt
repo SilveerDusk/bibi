@@ -1,0 +1,20 @@
+write-empty-key — attacker-info turnaround targeting team 103 (greatteam26)
+
+Origin: attacker-info/985-correctness-write-empty-key-CPSLO (submission 985, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: write succeeds when -k "" (empty key) is supplied.
+
+Spec: the key must be a non-empty string. write with -k "" must print
+"invalid" and exit 255.
+
+Root cause: stor.c line 384 checks only (!key) but not (strlen(key)==0).
+Both the register (command 1) and write (command 3) accept an empty key.
+stor-old.c explicitly checks strlen(key)==0 and returns invalid() for both.
+
+Trigger:
+  ./stor -u alice -k "" register   -> exit 0  (Bug: should be 255)
+  ./stor -u alice -f f create       -> exit 0
+  ./stor -u alice -k "" -f f write hello -> exit 0  (Bug: should be 255)
+Expected: command 3 stdout="invalid", exit 255
+Observed: exit 0, file written successfully

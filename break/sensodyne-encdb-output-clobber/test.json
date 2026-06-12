@@ -1,0 +1,98 @@
+{
+  "target_team": 104,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "alicekey",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "bob",
+        "-k",
+        "bobkey",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "alicefile",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "bob",
+        "-f",
+        "bobfile",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "alicekey",
+        "-f",
+        "alicefile",
+        "write",
+        "alice-data"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "bob",
+        "-k",
+        "bobkey",
+        "-f",
+        "bobfile",
+        "write",
+        "bob-data"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "alicekey",
+        "-f",
+        "alicefile",
+        "-o",
+        "enc.db",
+        "read"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "bob",
+        "-k",
+        "bobkey",
+        "-f",
+        "bobfile",
+        "read"
+      ]
+    }
+  ]
+}

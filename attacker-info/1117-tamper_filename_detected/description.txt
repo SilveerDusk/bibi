@@ -1,0 +1,8 @@
+Test case: tamper_filename_detected
+Type: integrity
+Target team: 108
+
+What it checks: tampering with plaintext filename in enc.db detected.
+How it triggers: create empty, edit empty to pwned in enc.db, read pwned.
+Expected: invalid/255.
+Counts as a break if: read succeeds.

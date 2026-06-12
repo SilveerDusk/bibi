@@ -2,9 +2,9 @@
 """Clone generic attacker-info break tests across all local break-it teams.
 
 The attacker-info folder contains attacks filed against CPSLO-108.  Some are
-generic fresh-DB correctness/crash probes and can be turned around against other
-teams by changing target_team.  Others are CPSLO-specific confidentiality,
-integrity, or exploit notes and should not be blindly cloned.
+generic fresh-DB correctness/crash/tamper probes and can be turned around against
+other teams by changing target_team.  Others are CPSLO-specific confidentiality,
+raw enc.db patch, or exploit notes and should not be blindly cloned.
 """
 import argparse
 import json
@@ -38,14 +38,89 @@ TEAM_SLUGS = {
 # useful as probes against other teams, but exact duplicate CPSLO attempts are not.
 GENERIC_ATTACKS = [
     {
+        "slug": "action-wrong-case",
+        "source": "1111-action_wrong_case",
+        "aliases": ["action-wrong-case", "wrong-case"],
+    },
+    {
+        "slug": "create-no-file",
+        "source": "1112-create_no_file",
+        "aliases": ["create-no-file"],
+    },
+    {
         "slug": "create-no-user",
         "source": "1113-create_no_user",
         "aliases": ["create-no-user"],
     },
     {
+        "slug": "filebomb-many-small",
+        "source": "1114-filebomb_many_small",
+        "aliases": ["filebomb-many-small", "filebomb"],
+    },
+    {
+        "slug": "large-binary-roundtrip",
+        "source": "1115-large_binary_file_roundtrip",
+        "aliases": ["large-binary-roundtrip"],
+    },
+    {
         "slug": "register-no-key",
         "source": "1116-register_no_key",
         "aliases": ["register-no-key"],
+    },
+    {
+        "slug": "tamper-filename",
+        "source": "1117-tamper_filename_detected",
+        "aliases": ["tamper-filename"],
+    },
+    {
+        "slug": "unknown-action",
+        "source": "1118-unknown_action",
+        "aliases": ["unknown-action"],
+    },
+    {
+        "slug": "unknown-option",
+        "source": "1119-unknown_option",
+        "aliases": ["unknown-option"],
+    },
+    {
+        "slug": "write-before-create",
+        "source": "1120-write_before_create",
+        "aliases": ["write-before-create"],
+    },
+    {
+        "slug": "appended-forgery",
+        "source": "1029-team108_appended_forgery_accepted",
+        "aliases": ["appended-forgery"],
+    },
+    {
+        "slug": "bitflip-tamper",
+        "source": "1030-team108_bitflip_tamper_undetected",
+        "aliases": ["bitflip-tamper"],
+    },
+    {
+        "slug": "integrity-target-tamper",
+        "source": "1031-team108_integrity_target_tamper_undetected",
+        "aliases": ["integrity-target-tamper"],
+    },
+    {
+        "slug": "rollback-undetected",
+        "source": "1032-team108_rollback_undetected",
+        "aliases": ["rollback-undetected"],
+    },
+    {
+        "slug": "second-file-tamper",
+        "source": "1033-team108_second_file_tamper_undetected",
+        "aliases": ["second-file-tamper"],
+    },
+    {
+        "slug": "tampered-db-create",
+        "source": "1034-team108_tampered_db_create_accepted",
+        "aliases": ["tampered-db-create"],
+    },
+    {
+        "slug": "tampered-db-write",
+        "source": "1035-team108_tampered_db_write_accepted",
+        "aliases": ["tampered-db-write"],
     },
     {
         "slug": "duplicate-create",
@@ -73,14 +148,79 @@ GENERIC_ATTACKS = [
         "aliases": ["create-extra-positional"],
     },
     {
+        "slug": "encdb-output-clobber",
+        "source": "887-team108_encdb_output_clobber",
+        "aliases": ["encdb-output-clobber"],
+    },
+    {
         "slug": "corrupt-db",
         "source": "888-team108_huge_blob_length",
         "aliases": ["corrupt-db", "huge-blob-length"],
     },
     {
+        "slug": "huge-user-count",
+        "source": "889-team108_huge_user_count",
+        "aliases": ["huge-user-count"],
+    },
+    {
+        "slug": "input-file-device",
+        "source": "890-team108_input_file_device",
+        "aliases": ["input-file-device"],
+    },
+    {
         "slug": "fifo-hang",
         "source": "891-team108_input_file_fifo_timeout",
         "aliases": ["fifo-hang"],
+    },
+    {
+        "slug": "input-file-directory",
+        "source": "892-team108_input_file_is_directory",
+        "aliases": ["input-file-directory", "input-file-is-directory"],
+    },
+    {
+        "slug": "long-key-roundtrip",
+        "source": "893-team108_long_key_roundtrip",
+        "aliases": ["long-key-roundtrip"],
+    },
+    {
+        "slug": "oversized-input-file",
+        "source": "894-team108_oversized_input_file",
+        "aliases": ["oversized-input-file"],
+    },
+    {
+        "slug": "read-extra-positional",
+        "source": "896-team108_read_extra_positional",
+        "aliases": ["read-extra-positional"],
+    },
+    {
+        "slug": "register-extra-positional",
+        "source": "897-team108_register_extra_positional",
+        "aliases": ["register-extra-positional"],
+    },
+    {
+        "slug": "trailing-junk",
+        "source": "898-team108_trailing_junk_detected",
+        "aliases": ["trailing-junk"],
+    },
+    {
+        "slug": "write-extra-positional",
+        "source": "899-team108_write_extra_positional",
+        "aliases": ["write-extra-positional"],
+    },
+    {
+        "slug": "fifo-output-hang",
+        "source": "1718-cpslo108-crash-fifo-output",
+        "aliases": ["fifo-output-hang"],
+    },
+    {
+        "slug": "aad-collision",
+        "source": "959-CPSLO108-aad-collision-user-file",
+        "aliases": ["aad-collision"],
+    },
+    {
+        "slug": "control-flow-long-fields",
+        "source": "968-CPSLO108-win-control-flow-override",
+        "aliases": ["control-flow-long-fields"],
     },
     {
         "slug": "long-filename",
@@ -97,16 +237,33 @@ GENERIC_ATTACKS = [
         "source": "980-correctness-long-username-CPSLO",
         "aliases": ["long-username"],
     },
+    {
+        "slug": "write-empty-filename",
+        "source": "984-correctness-write-empty-filename-CPSLO",
+        "aliases": ["write-empty-filename"],
+    },
+    {
+        "slug": "write-empty-key",
+        "source": "985-correctness-write-empty-key-CPSLO",
+        "aliases": ["write-empty-key"],
+    },
 ]
 
 
 SKIPPED_ATTACKS = [
+    "1357-confidentiality-recover-CPSLO",
     "530-confidentiality-recover-CPSLO",
     "653-confidentiality-recover-CPSLO",
     "654-crash-dlmalloc-CPSLO",
     "655-integrity-forge-CPSLO",
     "656-security-shellcode-CPSLO",
+    "952-cpslo108-confidentiality-stored-key",
     "953-cpslo108-integrity-empty-file",
+    "956-t108_confidentiality-stored-keyhash",
+    "957-t108_crash-db-count-overflow",
+    "958-t108_integrity-stored-keyhash-patch",
+    "967-team108-integrity",
+    "1624-team108-integrity-empty-file-forgery",
     "987-confidentiality-recover-CPSLO",
 ]
 

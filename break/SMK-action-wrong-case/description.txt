@@ -1,0 +1,13 @@
+action-wrong-case — attacker-info turnaround targeting team 112 (SMK)
+
+Origin: attacker-info/1111-action_wrong_case (submission 1111, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: action_wrong_case
+Type: correctness
+Target team: 108
+
+What it checks: action verbs are case-sensitive; "Register" is not "register".
+How it triggers: run action "Register" with capital R.
+Expected: prints "invalid", exits 255.
+Counts as a break if: "Register" is treated as valid.

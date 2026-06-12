@@ -1,0 +1,105 @@
+{
+  "target_team": 106,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "good",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "bad",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "good",
+        "write",
+        "good_data"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "bad",
+        "write",
+        "bad_data"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cp enc.db enc.db.good && python3 -c \"d=bytearray(open('enc.db.good','rb').read()); start=len(d)//2; end=min(start+24,len(d));\\nfor i in range(start,end): d[i]^=0x0F\\nopen('enc.db','wb').write(d)\""
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "bad",
+        "read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "invalid",
+      "exit": 255
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "submission_id": 967,
+  "test_name": "team108-integrity",
+  "attacking_team": "sensodyne (104)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Integrity",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/967"
+}

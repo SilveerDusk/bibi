@@ -1,0 +1,7 @@
+{
+  "target_team": 108,
+  "type": "correctness",
+  "commands": [
+    {"program": "stor", "args": ["-u", "alice", "-k", "secret123", "Register"]}
+  ]
+}

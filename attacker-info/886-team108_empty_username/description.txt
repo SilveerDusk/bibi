@@ -1,0 +1,23 @@
+Target team: 108
+Bug title: Empty username accepted on register
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  stor -u "" -k k register
+
+Observed behavior:
+  register succeeds with exit 0.
+
+Expected behavior:
+  An empty username is invalid. stor should print invalid and exit 255.
+
+Why this violates the spec or security goal:
+  Accepting an empty username differs from the reference oracle and breaks user
+  identity semantics.
+
+Suspected file and line:
+  stor108.c main: checks !user but not strlen(user) == 0.
+
+Minimal reproducer:
+  stor -u "" -k k register

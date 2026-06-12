@@ -1,0 +1,13 @@
+{
+  "target_team": 108,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "python3",
+      "args": [
+        "-c",
+        "import struct\np='enc.db'\nd=bytearray(open(p,'rb').read())\nUSER=256+16+32\nFM=256+256+16+16+4\no=0\nuc=struct.unpack_from('<i',d,o)[0]; o+=4\nout=bytearray(d[:o+uc*USER]); o+=uc*USER\nfc=struct.unpack_from('<i',d,o)[0]; out+=d[o:o+4]; o+=4\nfor _ in range(fc):\n    m=bytearray(d[o:o+FM]); o+=FM\n    user=bytes(m[:256]).split(b'\\0',1)[0]\n    name=bytes(m[256:512]).split(b'\\0',1)[0]\n    elen=struct.unpack_from('<i',m,544)[0]\n    data=d[o:o+elen] if elen>0 else b''\n    if elen>0:\n        o+=elen\n    if user==b'user1' and name==b'file1':\n        struct.pack_into('<i',m,544,0)\n        out+=m\n    else:\n        out+=m+data\nopen(p,'wb').write(out)\n"
+      ]
+    }
+  ]
+}

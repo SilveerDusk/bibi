@@ -1,0 +1,18 @@
+{
+  "target_team": 108,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "stor",
+      "args": ["-u", "alice", "-k", "", "register"]
+    },
+    {
+      "program": "stor",
+      "args": ["-u", "alice", "-f", "f", "create"]
+    },
+    {
+      "program": "stor",
+      "args": ["-u", "alice", "-k", "", "-f", "f", "write", "hello"]
+    }
+  ]
+}

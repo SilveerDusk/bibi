@@ -1,0 +1,11 @@
+{
+  "submission_id": 1718,
+  "test_name": "cpslo108-crash-fifo-output",
+  "attacking_team": "GreatTeam26 (103)",
+  "target_team": "CPSLO (108)",
+  "status": "Tested",
+  "result": "Break valid",
+  "type": "Crash",
+  "fix_status": "Active",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/1718"
+}

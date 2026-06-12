@@ -1,0 +1,13 @@
+unknown-option — attacker-info turnaround targeting team 114 (uw)
+
+Origin: attacker-info/1119-unknown_option (submission 1119, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: unknown_option
+Type: correctness
+Target team: 108
+
+What it checks: unrecognized option -z rejected.
+How it triggers: register with extra -z flag.
+Expected: invalid/255.
+Counts as a break if: succeeds or prints non-invalid output.

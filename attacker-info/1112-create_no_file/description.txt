@@ -1,0 +1,8 @@
+Test case: create_no_file
+Type: correctness
+Target team: 108
+
+What it checks: create requires -f; omitting it is invalid.
+How it triggers: register alice, then create with no -f.
+Expected: register 0; create "invalid"/255.
+Counts as a break if: create succeeds with no filename.

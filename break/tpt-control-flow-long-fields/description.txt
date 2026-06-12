@@ -1,0 +1,10 @@
+control-flow-long-fields — attacker-info turnaround targeting team 107 (tpt)
+
+Origin: attacker-info/968-CPSLO108-win-control-flow-override (submission 968, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Part 1: Bug
+The program has unsafe input handling for usernames and filenames, and the build disables protections like stack canaries. Since win() exists in the binary, memory corruption can be used to redirect execution flow.
+
+Part 2: How it breaks
+We pass oversized inputs to trigger a buffer overflow during CLI argument handling. This corrupts memory and lets us overwrite control flow so execution jumps to win(). When that happens, the program prints Arbitrary access achieved!, showing successful control-flow hijacking.

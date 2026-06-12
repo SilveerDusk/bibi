@@ -1,0 +1,76 @@
+{
+  "target_team": 106,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "notes",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "notes",
+        "write",
+        "x"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cp enc.db enc.db.good && python3 -c \"from pathlib import Path; d=Path('enc.db.good').read_bytes(); fake=b'\\x05\\x00\\x00\\x00'+b'alice'+b'\\x00'*32; Path('enc.db').write_bytes(d+fake)\""
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "k",
+        "-f",
+        "notes",
+        "read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "invalid",
+      "exit": 255
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+trailing-junk — attacker-info turnaround targeting team 112 (SMK)
+
+Origin: attacker-info/898-team108_trailing_junk_detected (submission 898, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Trailing junk appended to enc.db is not detected
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Write integrity_target to a file, append JUNKJUNK to enc.db, then read with
+  the correct key.
+
+Observed behavior:
+  read returns integrity_target with exit 0.
+
+Expected behavior:
+  Any modification to enc.db outside normal stor use must be detected. The read
+  should print invalid and exit 255.
+
+Why this violates the spec or security goal:
+  Forgery detection requires rejecting structurally invalid databases. Ignoring
+  trailing bytes lets tampered enc.db files pass authentication.
+
+Suspected file and line:
+  stor108.c db_load: fread stops at logical end without checking for trailing data.
+
+Minimal reproducer:
+  printf JUNKJUNK >> enc.db
+  stor -u alice -k secret123 -f f read

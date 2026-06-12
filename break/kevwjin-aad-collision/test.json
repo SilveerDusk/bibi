@@ -1,0 +1,90 @@
+{
+  "target_team": 106,
+  "type": "integrity",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "a",
+        "-k",
+        "key1",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "ab",
+        "-k",
+        "key2",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "a",
+        "-f",
+        "bc",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "ab",
+        "-f",
+        "c",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "a",
+        "-k",
+        "key1",
+        "-f",
+        "bc",
+        "write"
+      ],
+      "stdin": "FILE_A_DATA"
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "ab",
+        "-k",
+        "key2",
+        "-f",
+        "c",
+        "write"
+      ],
+      "stdin": "FILE_B_DATA"
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "a",
+        "-k",
+        "key1",
+        "-f",
+        "bc",
+        "read"
+      ],
+      "expected": [
+        {
+          "exit": 0,
+          "stdout": "FILE_B_DATA"
+        }
+      ]
+    }
+  ]
+}

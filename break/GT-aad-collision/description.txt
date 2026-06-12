@@ -1,0 +1,10 @@
+aad-collision — attacker-info turnaround targeting team 101 (GT)
+
+Origin: attacker-info/959-CPSLO108-aad-collision-user-file (submission 959, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Part 1: Bug
+AES-GCM AAD is built by concatenating username and filename with no delimiter, allowing collisions between different (username, filename) pairs (e.g., "a"+"bc" and "ab"+"c" both produce "abc"). This breaks proper domain separation of encryption contexts.
+
+Part 2: How it breaks
+The test creates two users and files whose (username, filename) pairs produce identical AAD strings. Each file is written with different content. Because the AAD collision makes the encryption context ambiguous, decrypting user1/file1 returns the ciphertext intended for user2/file2, without knowing either key, violating integrity.

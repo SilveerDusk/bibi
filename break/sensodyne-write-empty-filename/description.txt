@@ -1,0 +1,19 @@
+write-empty-filename — attacker-info turnaround targeting team 104 (sensodyne)
+
+Origin: attacker-info/984-correctness-write-empty-filename-CPSLO (submission 984, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Bug: write succeeds when -f "" (empty filename) is supplied.
+
+Spec: filename must be non-empty. write with -f "" must print "invalid"
+and exit 255.
+
+Root cause: stor.c line 384 checks only (!file) for write, not strlen(file)==0.
+stor-old.c checks strlen(file)==0 and returns invalid().
+
+Trigger:
+  ./stor -u alice -k secret register   -> exit 0
+  ./stor -u alice -f "" create          -> exit 0  (Bug: should be 255)
+  ./stor -u alice -k secret -f "" write payload -> exit 0  (Bug: should be 255)
+Expected: command 3 stdout="invalid", exit 255
+Observed: exit 0, file written successfully

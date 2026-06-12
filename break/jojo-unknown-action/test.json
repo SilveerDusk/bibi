@@ -1,0 +1,26 @@
+{
+  "target_team": 109,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "secret123",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-k",
+        "secret123",
+        "bogus"
+      ]
+    }
+  ]
+}

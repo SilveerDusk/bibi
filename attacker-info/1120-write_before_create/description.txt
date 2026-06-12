@@ -1,0 +1,8 @@
+Test case: write_before_create
+Type: correctness
+Target team: 108
+
+What it checks: writing to file that was never created is invalid.
+How it triggers: register, then write to ghost without create.
+Expected: register 0; write invalid/255.
+Counts as a break if: write to uncreated file succeeds.

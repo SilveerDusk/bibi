@@ -1,0 +1,13 @@
+unknown-action — attacker-info turnaround targeting team 114 (uw)
+
+Origin: attacker-info/1118-unknown_action (submission 1118, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: unknown_action
+Type: correctness
+Target team: 108
+
+What it checks: unknown action verb rejected.
+How it triggers: register, then run "bogus" action.
+Expected: register 0; "bogus" invalid/255.
+Counts as a break if: unknown action accepted.

@@ -1,0 +1,26 @@
+appended-forgery — attacker-info turnaround targeting team 115 (husker)
+
+Origin: attacker-info/1029-team108_appended_forgery_accepted (submission 1029, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Appended forged bytes to enc.db are ignored instead of rejected
+Bug type: integrity
+Source testcase: security_focus_tests.sh J12_appended_forgery_rejected
+
+Appending forged record bytes to enc.db should make the database invalid (no
+trailing junk allowed). stor108 ignores the appended data and still reads the
+original file content with exit 0.
+
+Minimal reproducer:
+  stor -u alice -k k register
+  stor -u alice -f notes create
+  stor -u alice -k k -f notes write x
+  append forged length-prefixed record bytes to enc.db (see test.json shell step)
+  stor -u alice -k k -f notes read
+
+Observed: stdout=x, exit 0
+Expected: stdout=invalid, exit 255
+
+Why this violates the spec: enc.db must reject structural tampering including
+trailing appended data.

@@ -1,25 +1,34 @@
 # Breaks tested against us (CPSLO, team 108)
 
-Downloaded from https://hpen-bibi.com/participation/108/breaksubmissions. Last refresh: 2026-06-11 (second pull).
-Each folder is `<submission_id>-<test_name>/` with the attacker's `test.json`, `description.txt`, and a `break_meta.json` sidecar.
+Downloaded from https://hpen-bibi.com/participation/108/breaksubmissions. Last refresh: 2026-06-11 (third pull). 109 total submissions against us; 63 archived locally as `<id>-<name>/`.
 
-## ⚠️ VALID breaks against us (all fix-status Active = UNFIXED)
+## ⚠️ VALID breaks against us (13, all Active = UNFIXED)
 
-| ID | Test | Attacker | Type | Severity |
-|----|------|----------|------|----------|
-| 541 | correctness-create-no-user-CPSLO | jojo (109) | Correctness | 25 |
-| 888 | team108_huge_blob_length | 0xwizards (105) | Correctness | 25 |
-| 891 | team108_input_file_fifo_timeout | 0xwizards (105) | Crash | 50 🟠 |
-| 953 | cpslo108-integrity-empty-file | GreatTeam26 (103) | Integrity | 100 🔴 |
-| 978 | correctness-long-filename-CPSLO | jojo (109) | Correctness | 25 |
-| 979 | correctness-long-key-CPSLO | jojo (109) | Correctness | 25 |
-| 980 | correctness-long-username-CPSLO | jojo (109) | Correctness | 25 |
-| 987 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | 100 🔴 |
-| 1113 | create_no_user | 0xwizards (105) | Correctness | 25 |
-| 1116 | register_no_key | 0xwizards (105) | Correctness | 25 |
+| ID | Test | Attacker | Type | Severity | Archived |
+|----|------|----------|------|----------|----------|
+| 541 | correctness-create-no-user-CPSLO | jojo (109) | Correctness | 25 | ✅ |
+| 888 | team108_huge_blob_length | 0xwizards (105) | Correctness | 25 | ✅ |
+| 891 | team108_input_file_fifo_timeout | 0xwizards (105) | Crash | 50 🟠 | ✅ |
+| 953 | cpslo108-integrity-empty-file | GreatTeam26 (103) | Integrity | 100 🔴 | ✅ |
+| 978 | correctness-long-filename-CPSLO | jojo (109) | Correctness | 25 | ✅ |
+| 979 | correctness-long-key-CPSLO | jojo (109) | Correctness | 25 | ✅ |
+| 980 | correctness-long-username-CPSLO | jojo (109) | Correctness | 25 | ✅ |
+| 1113 | create_no_user | 0xwizards (105) | Correctness | 25 | ✅ |
+| 1116 | register_no_key | 0xwizards (105) | Correctness | 25 | ✅ |
+| 1120 | write_before_create | 0xwizards (105) | Correctness | 25 | ✅ |
+| 1357 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | 100 🔴 | ✅ |
+| 1624 | team108-integrity-empty-file-forgery | sensodyne (104) | Integrity | 100 🔴 | ✅ |
+| 1718 | cpslo108-crash-fifo-output | GreatTeam26 (103) | Crash | 50 🟠 | ✅ |
 
-## All incoming breaks (full log)
+## Distinct VALID break classes (what to fix)
+- **Confidentiality 100** — #987, #1357 (jojo): `key_hash` stored plaintext == AES key; enc.db reader extracts key. **Highest priority.**
+- **Integrity 100** — #953 (GreatTeam26), #1624 (sensodyne): `encrypted_len==0` skips GCM verify → file1 emptied while real key still verifies.
+- **Crash 50** — #891 (0xwizards): `write -i <FIFO>` hangs >60s. #1718 (GreatTeam26): `read -o <FIFO>`-style output crash.
+- **Correctness 25** — #541/#1113 create-no-user; #1116 register-no-key; #978/#979/#980 long name/key/user (MAX_NAME `>=` off-by-one); #888 corrupt-db read; #1120 write-before-create.
 
+**Note:** 46 breaks not archived locally — mostly Rejected tamper-variants whose `/download` returns 404 (artifacts not retained), plus 5 still Pending (#1596-1600).
+
+## Full incoming log
 | ID | Test | Attacker | Type | Status | Result |
 |----|------|----------|------|--------|--------|
 | 530 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | Rejected | Break invalid |
@@ -64,7 +73,7 @@ Each folder is `<submission_id>-<test_name>/` with the attacker's `test.json`, `
 | 980 | correctness-long-username-CPSLO | jojo (109) | Correctness | Tested | ✅ valid |
 | 984 | correctness-write-empty-filename-CPSLO | jojo (109) | Correctness | Rejected | Break invalid |
 | 985 | correctness-write-empty-key-CPSLO | jojo (109) | Correctness | Rejected | Break invalid |
-| 987 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | Tested | ✅ valid |
+| 987 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | Rejected | Break invalid |
 | 989 | integrity-forge-CPSLO | jojo (109) | Integrity | Rejected | Break invalid |
 | 1029 | team108_appended_forgery_accepted | 0xwizards (105) | Integrity | Rejected | Break invalid |
 | 1030 | team108_bitflip_tamper_undetected | 0xwizards (105) | Integrity | Rejected | Break invalid |
@@ -80,18 +89,54 @@ Each folder is `<submission_id>-<test_name>/` with the attacker's `test.json`, `
 | 1115 | large_binary_file_roundtrip | 0xwizards (105) | Correctness | Rejected | Break invalid |
 | 1116 | register_no_key | 0xwizards (105) | Correctness | Tested | ✅ valid |
 | 1117 | tamper_filename_detected | 0xwizards (105) | Integrity | Rejected | Break invalid |
-| 1118 | unknown_action | 0xwizards (105) | Correctness | Testing | — |
-| 1119 | unknown_option | 0xwizards (105) | Correctness | Pending | — |
-| 1120 | write_before_create | 0xwizards (105) | Correctness | Pending | — |
-| 1121 | wrong_key_rejected | 0xwizards (105) | Correctness | Pending | — |
-
-## Root-cause summary of the VALID breaks
-- **#987 Confidentiality (jojo)** — `enc.db` stores `key_hash` (PBKDF2 output) in plaintext, and that SAME value is used directly as the AES-256-GCM key. Anyone who reads enc.db extracts the key and decrypts user2/file2. Recovered flag: `f954f202f6ec0f0a1bdd082f95d104ebe06e742ab9813a1f`. **Fix: derive the AES key separately from the stored verifier (e.g. distinct KDF labels / HKDF), never store the encryption key.**
-- **#953 Integrity (GreatTeam26)** — `read` treats `encrypted_len==0` as an empty file and SKIPS AES-GCM verification. Rewriting enc.db to set user1/file1 ct-len to 0 empties file1 while user1's real key still verifies. **Fix: always run GCM tag verification; do not special-case len==0.**
-- **#891 Crash (0xwizards)** — `write -i <FIFO>` blocks forever (>60s) reading an input FIFO with no writer. **Fix: don't open/read regular-file inputs that are FIFOs/devices, or bound the read.**
-- **#978/#979/#980 Correctness (jojo)** — off-by-one: `MAX_NAME=256` with `strlen >= 256` rejects valid 256-char username/key/filename; reference accepts up to 4096. **Fix: use `>` not `>=`, and match the reference's length cap.**
-- **#888 Correctness (0xwizards)** — a read after corrupting enc.db metadata still returns content (we don't detect the tamper) where the oracle rejects it. **Fix: authenticate db metadata / detect corruption on load.**
-- **#1116 Correctness (0xwizards)** — `register` with no `-k` succeeds; must be invalid/255. **Fix: require a key for register.**
-- **#541/#1113 Correctness (jojo / 0xwizards)** — `create` for an unregistered user succeeds; must be invalid/255. **Fix: reject create when the user does not exist.**
-
-**Pending/Testing (not yet judged):** #1118 unknown_action, #1119 unknown_option, #1120 write_before_create, #1121 wrong_key_rejected (all 0xwizards).
+| 1118 | unknown_action | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1119 | unknown_option | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1120 | write_before_create | 0xwizards (105) | Correctness | Tested | ✅ valid |
+| 1121 | wrong_key_rejected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1197 | team108_appended_magic_header_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1198 | team108_ascii_replacement_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1199 | team108_back_padding_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1200 | team108_clear_last_64_silent_empty | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1202 | team108_duplicate_prefix_crash | 0xwizards (105) | Crash | Rejected | Break invalid |
+| 1204 | team108_flip_at_90_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1206 | team108_full_db_appended_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1207 | team108_middle_marker_forgery_undetected | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1296 | team108_ob_absolute_encdb_output_clobber | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1297 | team108_ob_dev_stdout_leak | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1298 | team108_ob_encdb_fifo_hang | 0xwizards (105) | Crash | Rejected | Break invalid |
+| 1299 | team108_ob_encdb_hardlink_clobber | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1300 | team108_ob_encdb_symlink_followed | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1301 | team108_ob_fd1_stdout_leak | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1302 | team108_ob_fd2_stderr_leak | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1303 | team108_ob_input_hardlink_encdb | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1304 | team108_ob_input_symlink_encdb | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1305 | team108_ob_relative_encdb_output_clobber | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1306 | team108_ob_stdout_symlink_leak | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1307 | team108_ob_unreadable_encdb_reads | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1357 | confidentiality-recover-CPSLO | jojo (109) | Confidentiality | Tested | ✅ valid |
+| 1472 | team108_ae_append_ff_undetected | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1473 | team108_ae_append_nul_undetected | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1474 | team108_ae_encdb_perms_644 | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1475 | team108_ae_filename_plaintext_in_db | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1476 | team108_ae_input_dev_full | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1477 | team108_ae_input_fifo_hang | 0xwizards (105) | Crash | Rejected | Break invalid |
+| 1478 | team108_ae_input_symlink_dev_zero | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1479 | team108_ae_output_dev_full_accepted | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1480 | team108_ae_output_symlink_dev_full | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1481 | team108_ae_tamper_then_create | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1482 | team108_ae_tamper_then_register | 0xwizards (105) | Integrity | Rejected | Break invalid |
+| 1483 | team108_ae_username_plaintext_in_db | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1484 | team108_ae_write_extra_positional_after_text | 0xwizards (105) | Correctness | Rejected | Break invalid |
+| 1536 | r2-correctness-cpslo-long-read-user | jojo (109) | Correctness | Rejected | Break invalid |
+| 1537 | r2-correctness-cpslo-long-write-file | jojo (109) | Correctness | Rejected | Break invalid |
+| 1547 | team108-integrity | sensodyne (104) | Integrity | Rejected | Break invalid |
+| 1560 | team108-integrity-empty-file-forgery | sensodyne (104) | Integrity | Rejected | Break invalid |
+| 1569 | team108-integrity | sensodyne (104) | Integrity | Rejected | Break invalid |
+| 1582 | team108-integrity-empty-file-forgery | sensodyne (104) | Integrity | Rejected | Break invalid |
+| 1596 | team108_tm_read_o_existing_file_clobber | 0xwizards (105) | Correctness | Pending | — |
+| 1597 | team108_tm_read_with_i_accepted | 0xwizards (105) | Correctness | Pending | — |
+| 1598 | team108_tm_tampered_db_read_o_creates_output | 0xwizards (105) | Integrity | Pending | — |
+| 1599 | team108_tm_tampered_db_read_undetected | 0xwizards (105) | Integrity | Pending | — |
+| 1600 | team108_tm_write_with_o_accepted | 0xwizards (105) | Correctness | Pending | — |
+| 1624 | team108-integrity-empty-file-forgery | sensodyne (104) | Integrity | Tested | ✅ valid |
+| 1718 | cpslo108-crash-fifo-output | GreatTeam26 (103) | Crash | Tested | ✅ valid |

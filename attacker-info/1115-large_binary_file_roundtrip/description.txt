@@ -1,0 +1,8 @@
+Test case: large_binary_file_roundtrip
+Type: correctness
+Target team: 108
+
+What it checks: large binary file under 600 MB preserved exactly.
+How it triggers: generate fuzz590.txt, write via -i, read via -o, cmp.
+Expected: all commands exit 0, cmp prints MATCH.
+Counts as a break if: large file corrupted/truncated/rejected.

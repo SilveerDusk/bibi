@@ -1,0 +1,11 @@
+{
+  "submission_id": 959,
+  "test_name": "CPSLO108-aad-collision-user-file",
+  "attacking_team": "TPT_Enterprise (107)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Integrity",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/959"
+}

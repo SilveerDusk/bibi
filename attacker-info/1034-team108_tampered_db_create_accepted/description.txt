@@ -1,0 +1,17 @@
+Target team: 108
+Bug title: create succeeds on a tampered enc.db
+Bug type: integrity
+Source testcase: extended_security_tests.sh Y9_tampered_db_rejects_create
+
+After tampering enc.db, keyless create must not proceed on corrupt state.
+stor108 performs create with exit 0.
+
+Minimal reproducer:
+  stor -u alice -k k register
+  stor -u alice -f notes create
+  stor -u alice -k k -f notes write seed
+  python3 -c "d=bytearray(open('enc.db','rb').read()); d[16]^=0x04; open('enc.db','wb').write(d)"
+  stor -u alice -f other create
+
+Observed: create exit 0
+Expected: stdout=invalid, exit 255

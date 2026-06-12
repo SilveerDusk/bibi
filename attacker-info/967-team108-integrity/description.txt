@@ -1,0 +1,6 @@
+enc.db has no integrity protection (no HMAC or MAC over the database
+structure). A python3 script reads enc.db, removes the user1/file1
+record entirely, and writes the modified database back. When the grader
+reads user1/file1 with the real key, stor returns invalid (file not
+found) instead of the original content — proving integrity is broken
+without knowing the user's secret key.

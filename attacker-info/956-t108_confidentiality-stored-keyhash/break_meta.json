@@ -1,0 +1,11 @@
+{
+  "submission_id": 956,
+  "test_name": "t108_confidentiality-stored-keyhash",
+  "attacking_team": "GreatTeam26 (103)",
+  "target_team": "CPSLO (108)",
+  "status": "Rejected",
+  "result": "Break invalid",
+  "type": "Confidentiality",
+  "fix_status": "\u2014",
+  "url": "https://hpen-bibi.com/participation/108/breaksubmission/956"
+}

@@ -1,0 +1,23 @@
+Target team: 108
+Bug title: register accepts an extra positional argument
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  stor -u alice -k secret123 register extra
+
+Observed behavior:
+  register succeeds with exit 0.
+
+Expected behavior:
+  register takes no inline text. An extra positional argument is invalid and must
+  produce invalid/255.
+
+Why this violates the spec or security goal:
+  Contradictory or malformed argument combinations must be rejected per spec.
+
+Suspected file and line:
+  stor108.c register handler: does not validate optind+1 < argc.
+
+Minimal reproducer:
+  stor -u alice -k secret123 register extra

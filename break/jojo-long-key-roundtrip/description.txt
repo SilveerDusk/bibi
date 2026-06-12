@@ -1,0 +1,32 @@
+long-key-roundtrip — attacker-info turnaround targeting team 109 (jojo)
+
+Origin: attacker-info/893-team108_long_key_roundtrip (submission 893, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: Secret keys longer than 255 bytes are rejected
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Register alice with a 300-byte key, create file f, write x, then read f with
+  the same key.
+
+Observed behavior:
+  stor108.c rejects keys with strlen(key) >= MAX_NAME (256) at register, printing
+  invalid and exiting 255.
+
+Expected behavior:
+  The spec does not cap key length at 255 bytes. The reference oracle accepts
+  longer keys and returns the written content on read.
+
+Why this violates the spec or security goal:
+  Valid input is rejected, so exit status and output differ from the reference
+  implementation.
+
+Suspected file and line:
+  stor108.c line 331: strlen(key) >= MAX_NAME check in register.
+
+Minimal reproducer:
+  K=$(python3 -c 'print("k"*300)')
+  stor -u alice -k "$K" register

@@ -1,0 +1,26 @@
+Target team: 108
+Bug title: Corrupt user_count in enc.db is not detected
+Bug type: correctness
+Severity: 25 points
+
+Command used:
+  Register alice, corrupt the first four bytes of enc.db (user_count) to
+  0xFFFFFFFF, then attempt another register.
+
+Observed behavior:
+  The second register succeeds with exit 0.
+
+Expected behavior:
+  A corrupt database must be rejected with invalid/255 on any subsequent stor
+  command.
+
+Why this violates the spec or security goal:
+  Forgery detection requires rejecting malformed enc.db structures. Accepting a
+  corrupted user_count differs from the reference oracle.
+
+Suspected file and line:
+  stor108.c db_load: no bounds check on db->user_count before malloc/fread.
+
+Minimal reproducer:
+  python3 -c "d=bytearray(open('enc.db','rb').read());d[0:4]=b'\\xff\\xff\\xff\\xff';open('enc.db','wb').write(d)"
+  stor -u alice -k k register

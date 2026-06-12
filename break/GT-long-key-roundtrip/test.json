@@ -1,0 +1,52 @@
+{
+  "target_team": 101,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "K=$(python3 -c 'print(\"k\"*300)'); stor -u alice -k \"$K\" register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "alice",
+        "-f",
+        "f",
+        "create"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "K=$(python3 -c 'print(\"k\"*300)'); stor -u alice -k \"$K\" -f f write x"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "K=$(python3 -c 'print(\"k\"*300)'); stor -u alice -k \"$K\" -f f read"
+      ]
+    }
+  ],
+  "expected": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    },
+    {
+      "stdout": "x",
+      "exit": 0
+    }
+  ]
+}

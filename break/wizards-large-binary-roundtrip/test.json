@@ -1,0 +1,70 @@
+{
+  "target_team": 105,
+  "type": "correctness",
+  "commands": [
+    {
+      "program": "python3",
+      "args": [
+        "-c",
+        "with open('/tmp/fuzz590.txt','wb') as f:\n    pattern = b'test\\\\x00data\\\\xffmore' * 100000\n    written = 0\n    while written < 590000000:\n        chunk = pattern[:min(len(pattern), 590000000 - written)]\n        f.write(chunk)\n        written += len(chunk)"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "u",
+        "-k",
+        "k",
+        "register"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "u",
+        "-k",
+        "k",
+        "-f",
+        "note",
+        "create"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "u",
+        "-k",
+        "k",
+        "-f",
+        "note",
+        "-i",
+        "/tmp/fuzz590.txt",
+        "write"
+      ]
+    },
+    {
+      "program": "stor",
+      "args": [
+        "-u",
+        "u",
+        "-k",
+        "k",
+        "-f",
+        "note",
+        "-o",
+        "/tmp/out590.txt",
+        "read"
+      ]
+    },
+    {
+      "program": "sh",
+      "args": [
+        "-c",
+        "cmp -s /tmp/fuzz590.txt /tmp/out590.txt && echo MATCH || echo DIFF"
+      ]
+    }
+  ]
+}

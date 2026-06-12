@@ -1,0 +1,31 @@
+encdb-output-clobber — attacker-info turnaround targeting team 105 (wizards)
+
+Origin: attacker-info/887-team108_encdb_output_clobber (submission 887, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Target team: 108
+Bug title: read -o can overwrite enc.db and destroy other users' data
+Bug type: integrity
+Severity: 100 points
+
+Command used:
+  Register alice and bob, write a file for each, then read alice's file with
+  -o enc.db. Attempt to read bob's file afterward.
+
+Observed behavior:
+  Alice's read -o enc.db succeeds and replaces the database with alice's file
+  bytes. Bob's subsequent authenticated read fails with invalid/255.
+
+Expected behavior:
+  stor must reject output paths that would overwrite enc.db. Bob's data must
+  remain intact.
+
+Why this violates the spec or security goal:
+  A user who only knows their own key can corrupt the entire encrypted database,
+  including other users' files. This defeats per-user integrity protection.
+
+Suspected file and line:
+  stor108.c read handler: fopen(outfile, "wb") with no guard against enc.db.
+
+Minimal reproducer:
+  stor -u alice -k alicekey -f alicefile -o enc.db read

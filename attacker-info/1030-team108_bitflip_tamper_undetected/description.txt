@@ -1,0 +1,21 @@
+Target team: 108
+Bug title: Single-byte tamper in enc.db is not detected on read
+Bug type: integrity
+Source testcase: security_focus_tests.sh J4_bitflip_quarter_offset
+
+Flipping one byte at approximately 25% into enc.db should invalidate the
+database when the correct key is supplied. stor108 still returns the original
+"integrity_target" plaintext with exit 0.
+
+Minimal reproducer:
+  stor -u alice -k k register
+  stor -u alice -f notes create
+  stor -u alice -k k -f notes write integrity_target
+  python3 -c "d=bytearray(open('enc.db','rb').read()); off=len(d)//4; d[off]^=0x55; open('enc.db','wb').write(d)"
+  stor -u alice -k k -f notes read
+
+Observed: stdout=integrity_target, exit 0
+Expected: stdout=invalid, exit 255
+
+Why this violates the spec: External modification of enc.db must be detected
+(forgery detection) when the user later supplies the correct secret.

@@ -1,0 +1,13 @@
+filebomb-many-small — attacker-info turnaround targeting team 101 (GT)
+
+Origin: attacker-info/1114-filebomb_many_small (submission 1114, original result: Break invalid).
+This clone keeps the original command sequence and updates only target_team.
+
+Test case: filebomb_many_small
+Type: crash
+Target team: 108
+
+What it checks: many small file create/write operations do not cause crash or hang.
+How it triggers: register, then create/write 700 tiny files in loop.
+Expected: completes within 60s, no crash.
+Counts as a break if: timeout, segfault, or structural DB corruption.

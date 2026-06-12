@@ -1,0 +1,23 @@
+{
+  "target_team": 108,
+  "type": "confidentiality",
+  "commands": [
+    {
+      "program": "stor",
+      "args": ["-u", "a", "-k", "k", "register"]
+    },
+    {
+      "program": "stor",
+      "args": ["-u", "a", "-f", "p", "create"]
+    },
+    {
+      "program": "stor",
+      "args": ["-u", "a", "-k", "k", "-f", "p", "write", "f954f202f6ec0f0a1bdd082f95d104ebe06e742ab9813a1f"]
+    },
+    {
+      "program": "stor",
+      "args": ["-u", "a", "-k", "k", "-f", "p", "read"],
+      "output": "f954f202f6ec0f0a1bdd082f95d104ebe06e742ab9813a1f"
+    }
+  ]
+}

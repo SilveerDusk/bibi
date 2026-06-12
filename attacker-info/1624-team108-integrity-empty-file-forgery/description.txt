@@ -1,0 +1,13 @@
+Team 108 does not authenticate its database structure.
+
+Each file record stores an encrypted_len field in plaintext in enc.db, followed
+by that many ciphertext bytes. The read path verifies the real user's key, then
+trusts encrypted_len. If encrypted_len is 0 and no file_data pointer is present,
+it treats the file as a created-but-empty file and returns success without
+running AES-GCM verification.
+
+This break parses the provided enc.db, finds the user1/file1 FileMeta record,
+sets encrypted_len to 0, and omits the old ciphertext bytes when writing the
+database back. The user1 authentication record is left intact, so the grader's
+real key still verifies. Reading user1/file1 then returns empty content instead
+of the original integrity target.
